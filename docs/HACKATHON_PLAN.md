@@ -1,5 +1,14 @@
 # Beeline Relay: 14-Day NEAR Hackathon Plan (v2, aiming for the grand prize)
 
+> **v4 update (4 Nov 2026), which overrides everything below where they conflict: guardrails for agent swarms.**
+> On 4 Nov Illia Polosukhin listed "Swarm-for-Hire (with guardrails or governance AI review, please)" among the projects he wants to see. We don't pivot. We build **the guardrail layer that makes a paid agent swarm safe**, which is the part most swarm projects will skip.
+> - **Pitch:** "Beeline: the guardrails that make an agent swarm safe to pay."
+> - **New P0: AI-reviewer co-signature.** Payments at or above a threshold need an approval from a reviewer model on **NEAR AI Cloud**. The vault verifies the model's ed25519 response signature on-chain. The signed text is `{model}:{sha256(request)}:{sha256(response)}`, as documented at docs.near.ai/cloud/verification/reference/response-signature-verification. The vault also checks that the request used the owner's exact review policy prompt and that the answer approves *this* quote's hash. The reviewer's signing key is checked against NEAR AI's TEE attestation off-chain before the owner registers it. That limitation is stated plainly.
+> - **New P1: job escrow for a swarm.** A job's budget sits in the vault and several agents (each with its own key and limits) are paid from it. There is no marketplace or bidding UI.
+> - **Demo:** a swarm of 3 agents takes a job. The allowlist blocks the injected payment to an attacker. The AI reviewer refuses a sneakier one that goes to an allowed recipient for a suspicious reason, and the vault blocks it on-chain. Honest agents get paid in USDC on Base.
+> - **Scope changes:** the console gets simpler, and chaos mode becomes the demo's attack scenes.
+> - **Schedule (replaces v3 Days 8–11):** Day 8 reviewer co-signature in the vault, plus the NEAR AI client in the API. Day 9 job escrow, MCP server and swarm agents. Day 10 off-chain policy, reconcile and evidence. Day 11 console. Days 12–14 are unchanged.
+
 > **v3 update (4 Nov 2026), which overrides the sections below where they conflict:**
 > - **Primary track is now AI Security & Defense.** The track asks for "spending limits, policy engines, sandboxed wallets… function call keys". Agent Economy and Real-World Money are secondary.
 > - **New P0: an on-chain NEAR agent vault.** It is a smart contract holding the funds. The agent gets only a function-call key, and per-payment limits, daily budget and recipient allowlist are enforced on-chain. This gives two layers of defense: Beeline's API (reliability and policy) and the vault (hard limits even if the agent and the server are compromised).

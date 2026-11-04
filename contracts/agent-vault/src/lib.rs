@@ -12,13 +12,17 @@
 //!   3. refunds go back to **this vault**, in the vault's own token,
 //!   4. the amount is within the **per-payment limit** and the agent's **daily budget**,
 //!   5. the quote is **fresh** and its deadline is not close,
-//!   6. the deposit address has **never been paid** before.
+//!   6. the deposit address has **never been paid** before,
+//!   7. at or above the owner's threshold, a **NEAR AI reviewer model approved this exact
+//!      quote** under the owner's policy prompt, proven by the model's TEE signing key
+//!      (see `review.rs`).
 //!
 //! A prompt-injected agent, or a compromised Beeline server, cannot get past these checks: it
 //! cannot forge 1Click's signature or change the allowlist, and every rejection is a failed
 //! transaction anyone can see on the explorer.
 
 mod quote;
+mod review;
 
 use near_sdk::json_types::U128;
 use near_sdk::store::{IterableMap, IterableSet, LookupSet};
@@ -28,6 +32,8 @@ use near_sdk::{
 };
 
 pub use quote::parse_rfc3339_utc;
+pub use review::Review;
+use review::Reviewer;
 
 const NS_PER_DAY: u64 = 86_400 * 1_000_000_000;
 const NS_PER_SEC: u64 = 1_000_000_000;
@@ -87,6 +93,17 @@ pub struct AgentVault {
     destination_assets: IterableSet<String>,
     agents: IterableMap<PublicKey, Agent>,
     used_deposits: LookupSet<String>,
+    reviewer: Option<Reviewer>,
+}
+
+/// The registered AI reviewer, as shown by `get_reviewer`.
+#[near(serializers = [json])]
+pub struct ReviewerView {
+    pub model: String,
+    /// Hex ed25519 public key (NEAR AI's `signing_address` for ed25519).
+    pub signing_key: String,
+    pub policy_prompt_sha256: String,
+    pub threshold: U128,
 }
 
 fn reject(reason: &str) -> ! {
@@ -137,6 +154,7 @@ impl AgentVault {
             destination_assets: IterableSet::new(StorageKey::DestinationAssets),
             agents: IterableMap::new(StorageKey::Agents),
             used_deposits: LookupSet::new(StorageKey::UsedDeposits),
+            reviewer: None,
         };
         for r in allowed_recipients {
             vault.recipients.insert(r);
@@ -150,8 +168,9 @@ impl AgentVault {
     // ----- Agent entry point -------------------------------------------------------------
 
     /// Pays the deposit address of a 1Click-signed quote, if every policy check passes.
-    /// Callable only with an active agent access key on this account.
-    pub fn pay_quote(&mut self, quote_json: String) -> Promise {
+    /// Callable only with an active agent access key on this account. `review` is required
+    /// when a reviewer is registered and the amount is at or above its threshold.
+    pub fn pay_quote(&mut self, quote_json: String, review: Option<Review>) -> Promise {
         if self.paused {
             reject("vault is paused");
         }
@@ -230,6 +249,30 @@ impl AgentVault {
             reject("this deposit address has already been paid");
         }
 
+        // AI reviewer co-signature.
+        let approval = match &self.reviewer {
+            Some(reviewer) if amount >= reviewer.threshold => {
+                let review = review.as_ref().unwrap_or_else(|| {
+                    reject(&format!(
+                        "payments of {} or more need an AI reviewer approval",
+                        reviewer.threshold
+                    ))
+                });
+                Some(
+                    review::verify(
+                        review,
+                        reviewer,
+                        &quote_json,
+                        &q.hash,
+                        now / NS_PER_SEC,
+                        self.max_quote_age_secs,
+                    )
+                    .unwrap_or_else(|e| reject(&e)),
+                )
+            }
+            _ => None,
+        };
+
         // Daily budget.
         let today = now / NS_PER_DAY;
         if agent.day != today {
@@ -255,6 +298,18 @@ impl AgentVault {
         self.agents.insert(agent_pk.clone(), agent.clone());
         self.used_deposits.insert(q.deposit_address.clone());
 
+        if let (Some(a), Some(reviewer)) = (&approval, &self.reviewer) {
+            emit(
+                "review_approved",
+                near_sdk::serde_json::json!({
+                    "agent": agent.label,
+                    "model": reviewer.model,
+                    "request_sha256": a.request_sha256,
+                    "response_sha256": a.response_sha256,
+                    "quote_hash": q.hash,
+                }),
+            );
+        }
         emit(
             "payment_requested",
             near_sdk::serde_json::json!({
@@ -427,6 +482,47 @@ impl AgentVault {
         self.destination_assets.insert(asset_id);
     }
 
+    /// Registers the NEAR AI reviewer. Verify the model's TEE attestation report off-chain
+    /// first: its ed25519 `signing_address` must equal `signing_key`.
+    pub fn set_reviewer(
+        &mut self,
+        model: String,
+        signing_key: String,
+        policy_prompt_sha256: String,
+        threshold: U128,
+    ) {
+        self.assert_owner();
+        require!(
+            !model.is_empty() && model.len() <= 128,
+            "model must be 1-128 characters"
+        );
+        let signing_key = review::from_hex::<32>(&signing_key).unwrap_or_else(|e| reject(&e));
+        let policy_prompt_sha256 =
+            review::from_hex::<32>(&policy_prompt_sha256).unwrap_or_else(|e| reject(&e));
+        emit(
+            "reviewer_set",
+            near_sdk::serde_json::json!({
+                "model": model,
+                "signing_key": review::to_hex(&signing_key),
+                "policy_prompt_sha256": review::to_hex(&policy_prompt_sha256),
+                "threshold": threshold,
+            }),
+        );
+        self.reviewer = Some(Reviewer {
+            model,
+            signing_key,
+            policy_prompt_sha256,
+            threshold: threshold.0,
+        });
+    }
+
+    /// Removes the reviewer requirement.
+    pub fn clear_reviewer(&mut self) {
+        self.assert_owner();
+        self.reviewer = None;
+        emit("reviewer_cleared", near_sdk::serde_json::json!({}));
+    }
+
     pub fn set_paused(&mut self, paused: bool) {
         self.assert_owner();
         self.paused = paused;
@@ -459,6 +555,15 @@ impl AgentVault {
             min_deadline_margin_secs: self.min_deadline_margin_secs,
             paused: self.paused,
         }
+    }
+
+    pub fn get_reviewer(&self) -> Option<ReviewerView> {
+        self.reviewer.as_ref().map(|r| ReviewerView {
+            model: r.model.clone(),
+            signing_key: review::to_hex(&r.signing_key),
+            policy_prompt_sha256: review::to_hex(&r.policy_prompt_sha256),
+            threshold: U128(r.threshold),
+        })
     }
 
     pub fn get_recipients(&self) -> Vec<String> {

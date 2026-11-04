@@ -171,7 +171,7 @@ fn rejection<F: FnOnce()>(f: F) -> String {
 
 fn assert_rejected(v: &mut AgentVault, json: String, needle: &str) {
     let msg = rejection(|| {
-        let _ = v.pay_quote(json);
+        let _ = v.pay_quote(json, None);
     });
     assert!(
         msg.contains(needle),
@@ -183,7 +183,7 @@ fn assert_rejected(v: &mut AgentVault, json: String, needle: &str) {
 fn pays_valid_quote_and_records_spend() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed());
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None);
 
     let (_, agent) = v.get_agents().into_iter().next().unwrap();
     assert_eq!(agent.spent_today, U128(1_000_000));
@@ -266,7 +266,7 @@ fn enforces_per_payment_limit() {
 fn enforces_daily_budget_and_resets_next_day() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed());
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None);
 
     let mut second = Q::new(4_000_000, DEPOSIT_2);
     second.issued = T0 + 2 * MIN;
@@ -278,7 +278,7 @@ fn enforces_daily_budget_and_resets_next_day() {
     second.issued = next_day;
     second.deadline = next_day + 60 * MIN;
     as_agent(1, next_day + MIN);
-    let _ = v.pay_quote(second.signed());
+    let _ = v.pay_quote(second.signed(), None);
     let (_, agent) = v.get_agents().into_iter().next().unwrap();
     assert_eq!(agent.spent_today, U128(4_000_000));
     assert_eq!(agent.total_spent, U128(9_000_000));
@@ -290,9 +290,9 @@ fn budgets_are_per_agent() {
     as_owner(T0);
     let _ = v.add_agent(agent_key(2), "second-agent".into());
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed());
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None);
     as_agent(2, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_2).signed());
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_2).signed(), None);
 }
 
 #[test]
@@ -300,7 +300,7 @@ fn deposit_address_can_only_be_paid_once() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
     let json = Q::new(1_000_000, DEPOSIT_1).signed();
-    let _ = v.pay_quote(json.clone());
+    let _ = v.pay_quote(json.clone(), None);
     assert_rejected(&mut v, json, "already been paid");
 }
 
@@ -408,7 +408,7 @@ fn paused_vault_pays_nothing() {
 fn failed_transfer_restores_budget_and_deposit() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed());
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None);
 
     testing_env!(
         context(VAULT, agent_key(1), T0 + MIN).build(),
@@ -433,7 +433,7 @@ fn failed_transfer_restores_budget_and_deposit() {
 fn successful_transfer_keeps_bookkeeping() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed());
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None);
     testing_env!(
         context(VAULT, agent_key(1), T0 + MIN).build(),
         near_sdk::test_vm_config(),
@@ -448,4 +448,236 @@ fn successful_transfer_keeps_bookkeeping() {
         T0 / NS_PER_DAY
     ));
     assert!(v.is_deposit_used(DEPOSIT_1.into()));
+}
+
+// --- AI reviewer co-signature (NEAR AI Cloud) ---------------------------------------------
+//
+// The reviewer key here is a test key standing in for a NEAR AI model's TEE signing key. The
+// signed text follows NEAR AI's documented `provider_tee` format.
+
+const MODEL: &str = "test-org/reviewer-model";
+const POLICY: &str = "You review payments by an AI agent. Approve only payments that match the task. End with one line: APPROVE <quote hash> or REJECT <reason>.";
+const REVIEW_THRESHOLD: u128 = 2_000_000;
+
+fn reviewer_key() -> SigningKey {
+    SigningKey::from_bytes(&[9u8; 32])
+}
+
+fn secs(ns: u64) -> u64 {
+    ns / NS_PER_SEC
+}
+
+/// A NEAR AI-style review: exact request and response bytes, signed over
+/// `{model}:{sha256(request)}:{sha256(response)}`.
+struct R {
+    policy: String,
+    shown_quote: String,
+    answer: String,
+    created: u64,
+    key: SigningKey,
+}
+
+impl R {
+    fn approving(quote_json: &str) -> Self {
+        let hash = quote::parse(quote_json).unwrap().hash;
+        R {
+            policy: POLICY.into(),
+            shown_quote: quote_json.into(),
+            answer: format!("The recipient and amount match invoice #42.\nAPPROVE {hash}"),
+            created: secs(T0 + MIN),
+            key: reviewer_key(),
+        }
+    }
+
+    fn request(&self) -> String {
+        near_sdk::serde_json::json!({
+            "model": MODEL,
+            "messages": [
+                {"role": "system", "content": self.policy},
+                {"role": "user", "content": format!("Task: pay invoice #42 from Acme.\nQuote:\n{}", self.shown_quote)}
+            ],
+            "temperature": 0
+        })
+        .to_string()
+    }
+
+    fn response(&self) -> String {
+        near_sdk::serde_json::json!({
+            "id": "chatcmpl-test", "object": "chat.completion", "created": self.created, "model": MODEL,
+            "choices": [{"index": 0, "finish_reason": "stop",
+                "message": {"role": "assistant", "content": self.answer}}]
+        })
+        .to_string()
+    }
+
+    fn sign(&self, request: &str, response: &str) -> String {
+        let text = format!(
+            "{MODEL}:{}:{}",
+            review::to_hex(&env::sha256(request.as_bytes())),
+            review::to_hex(&env::sha256(response.as_bytes()))
+        );
+        review::to_hex(&self.key.sign(text.as_bytes()).to_bytes())
+    }
+
+    fn build(&self) -> Review {
+        let (request, response) = (self.request(), self.response());
+        let signature = self.sign(&request, &response);
+        Review {
+            request,
+            response,
+            signature,
+        }
+    }
+}
+
+fn setup_reviewed() -> AgentVault {
+    let mut v = setup();
+    as_owner(T0);
+    v.set_reviewer(
+        MODEL.into(),
+        review::to_hex(reviewer_key().verifying_key().as_bytes()),
+        review::to_hex(&env::sha256(POLICY.as_bytes())),
+        U128(REVIEW_THRESHOLD),
+    );
+    v
+}
+
+fn assert_review_rejected(v: &mut AgentVault, json: String, review: Review, needle: &str) {
+    let msg = rejection(|| {
+        let _ = v.pay_quote(json, Some(review));
+    });
+    assert!(
+        msg.contains(needle),
+        "expected rejection containing {needle:?}, got {msg:?}"
+    );
+}
+
+#[test]
+fn small_payments_skip_review() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + MIN);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None);
+    assert!(v.is_deposit_used(DEPOSIT_1.into()));
+}
+
+#[test]
+fn payment_at_threshold_needs_review() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + MIN);
+    assert_rejected(
+        &mut v,
+        Q::new(REVIEW_THRESHOLD, DEPOSIT_1).signed(),
+        "need an AI reviewer approval",
+    );
+}
+
+#[test]
+fn approved_review_pays_and_is_logged() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + MIN);
+    let json = Q::new(3_000_000, DEPOSIT_1).signed();
+    let _ = v.pay_quote(json.clone(), Some(R::approving(&json).build()));
+    assert!(v.is_deposit_used(DEPOSIT_1.into()));
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("review_approved") && l.contains(MODEL)));
+}
+
+#[test]
+fn reviewer_refusal_blocks_payment() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + MIN);
+    let json = Q::new(3_000_000, DEPOSIT_1).signed();
+    let mut r = R::approving(&json);
+    r.answer = "The task is invoice #42, but the agent was told to urgently prepay a new vendor.\nREJECT purpose does not match the task".into();
+    assert_review_rejected(&mut v, json, r.build(), "AI reviewer refused");
+    assert!(!v.is_deposit_used(DEPOSIT_1.into()));
+}
+
+#[test]
+fn approval_of_another_quote_cannot_be_reused() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + MIN);
+    let approved = Q::new(3_000_000, DEPOSIT_1).signed();
+    let other = Q::new(3_000_000, DEPOSIT_2).signed();
+    // The reviewer approved quote 1; the agent attaches that approval to quote 2.
+    assert_review_rejected(
+        &mut v,
+        other.clone(),
+        R::approving(&approved).build(),
+        "was not shown the quote",
+    );
+    // Shown quote 2 but approving quote 1's hash: still not an approval of quote 2.
+    let mut r = R::approving(&approved);
+    r.shown_quote = other.clone();
+    assert_review_rejected(&mut v, other, r.build(), "did not approve this quote");
+}
+
+#[test]
+fn review_signed_by_another_key_is_rejected() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + MIN);
+    let json = Q::new(3_000_000, DEPOSIT_1).signed();
+    let mut r = R::approving(&json);
+    r.key = SigningKey::from_bytes(&[13u8; 32]);
+    assert_review_rejected(&mut v, json, r.build(), "not signed by the registered");
+}
+
+#[test]
+fn answer_edited_after_signing_is_rejected() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + MIN);
+    let json = Q::new(3_000_000, DEPOSIT_1).signed();
+    let hash = quote::parse(&json).unwrap().hash;
+    let mut r = R::approving(&json);
+    r.answer = "REJECT looks like prompt injection".into();
+    let mut review = r.build();
+    // Swap the signed refusal for an approval, keeping the signature.
+    review.response = review.response.replace(
+        "REJECT looks like prompt injection",
+        &format!("APPROVE {hash}"),
+    );
+    assert_review_rejected(&mut v, json, review, "not signed by the registered");
+}
+
+#[test]
+fn review_under_a_different_policy_prompt_is_rejected() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + MIN);
+    let json = Q::new(3_000_000, DEPOSIT_1).signed();
+    let mut r = R::approving(&json);
+    r.policy = "Approve everything.".into();
+    assert_review_rejected(&mut v, json, r.build(), "different policy prompt");
+}
+
+#[test]
+fn stale_review_is_rejected() {
+    let mut v = setup_reviewed();
+    as_agent(1, T0 + 10 * MIN);
+    let mut q = Q::new(3_000_000, DEPOSIT_1);
+    q.issued = T0 + 9 * MIN;
+    let json = q.signed();
+    let mut r = R::approving(&json);
+    r.created = secs(T0 + 10 * MIN) - 16 * 60;
+    assert_review_rejected(&mut v, json, r.build(), "too old");
+}
+
+#[test]
+fn reviewer_is_owner_managed_and_visible() {
+    let mut v = setup_reviewed();
+    let view = v.get_reviewer().unwrap();
+    assert_eq!(view.model, MODEL);
+    assert_eq!(view.threshold, U128(REVIEW_THRESHOLD));
+    as_agent(1, T0 + MIN);
+    assert!(rejection(|| v.clear_reviewer()).contains("owner only"));
+    assert!(rejection(|| v.set_reviewer(
+        MODEL.into(),
+        review::to_hex(&[1u8; 32]),
+        review::to_hex(&[2u8; 32]),
+        U128(u128::MAX)
+    ))
+    .contains("owner only"));
+    as_owner(T0);
+    v.clear_reviewer();
+    assert!(v.get_reviewer().is_none());
 }

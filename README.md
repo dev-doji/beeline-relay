@@ -15,7 +15,8 @@ Agents retry, lose context and act unsupervised — dangerous when they move mon
 | Idempotent payment sessions (replay, conflict, concurrent retries), quote expiry, workspace isolation | ✅ Implemented and integration-tested on PostgreSQL |
 | Server-side state machine (no stale regressions, terminal states final) | ✅ Implemented and tested; reconciliation that drives it is ⏳ next |
 | 1Click quote signature verification (Go and on-chain) | ✅ Implemented; verified against a real 1Click quote and key |
-| On-chain agent vault (NEAR): allowlist, signed-quote check, limits, single-use deposits, revocable agent keys | ✅ Implemented and unit-tested (23 tests); ❌ not yet deployed or audited |
+| On-chain agent vault (NEAR): allowlist, signed-quote check, limits, single-use deposits, revocable agent keys | ✅ Implemented and unit-tested; ❌ not yet deployed or audited |
+| AI-reviewer co-signature: above a threshold, a NEAR AI Cloud model must approve the exact quote under the owner's policy prompt, verified on-chain (33 vault tests in total) | ✅ Implemented and unit-tested with NEAR AI's documented signature format; ❌ not yet checked against a live NEAR AI signature; TEE attestation is verified off-chain |
 | Live mainnet route (USDC NEAR → Base) | ❌ Not yet verified |
 | MCP server for agents | ⏳ Planned |
 | Developer console | ⏳ Planned |
