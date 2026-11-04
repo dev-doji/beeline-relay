@@ -15,7 +15,11 @@ A free dress rehearsal of the vault on NEAR **testnet**, before any real money i
 
 ## Before you start (one time)
 
-1. **Create a testnet wallet account** at **https://testnet.mynearwallet.com**. Pick a name such as `yourname.testnet`. New testnet accounts come with free test NEAR.
+1. **Create a funded testnet account directly in the NEAR CLI** (recommended). The faucet gives it free test NEAR and the CLI keeps its key, so no browser step is needed:
+   ```powershell
+   near account create-account sponsor-by-faucet-service yourname-beeline.testnet autogenerate-new-keypair save-to-keychain network-config testnet create
+   ```
+   Then run the rehearsal with `-SkipImport`. A wallet account from testnet.mynearwallet.com also works through the browser import in step 1, but only if it holds more than 4 test NEAR (new wallet accounts can start with 0).
 2. **Install the NEAR CLI.** In PowerShell, run the official installer from NEAR's GitHub releases:
    ```powershell
    irm https://github.com/near/near-cli-rs/releases/latest/download/near-cli-rs-installer.ps1 | iex
@@ -28,7 +32,7 @@ A free dress rehearsal of the vault on NEAR **testnet**, before any real money i
 From the repository folder:
 
 ```powershell
-.\scripts\testnet-rehearsal.ps1 -Owner yourname.testnet
+.\scripts\testnet-rehearsal.ps1 -Owner yourname-beeline.testnet -SkipImport
 ```
 
 The script pauses before every step. In step 1 a browser window opens and **you** approve the connection in your wallet, so the CLI signs only with your approval.

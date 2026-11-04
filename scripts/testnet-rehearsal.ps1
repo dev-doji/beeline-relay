@@ -13,9 +13,13 @@
 
 .EXAMPLE
   .\scripts\testnet-rehearsal.ps1 -Owner alice.testnet
+.EXAMPLE
+  .\scripts\testnet-rehearsal.ps1 -Owner alice.testnet -SkipImport
 #>
 param(
-  [Parameter(Mandatory = $true)][string]$Owner
+  [Parameter(Mandatory = $true)][string]$Owner,
+  # Use when the account is already in the NEAR CLI (for example, created with sponsor-by-faucet-service).
+  [switch]$SkipImport
 )
 
 $ErrorActionPreference = 'Stop'
@@ -75,9 +79,11 @@ foreach ($tool in 'near', 'gh', 'go') {
   }
 }
 
-Step 1 "Connect your testnet account ($Owner) to the NEAR CLI (a browser window asks you to approve)"
-& near account import-account using-web-wallet @Net
-Ensure 'Connecting your account'
+if (-not $SkipImport) {
+  Step 1 "Connect your testnet account ($Owner) to the NEAR CLI (a browser window asks you to approve)"
+  & near account import-account using-web-wallet @Net
+  Ensure 'Connecting your account'
+}
 
 Step 2 "Create the vault account $Vault with 4 test NEAR from $Owner"
 & near account create-account fund-myself $Vault '4 NEAR' autogenerate-new-keypair save-to-keychain sign-as $Owner @Net sign-with-keychain send
