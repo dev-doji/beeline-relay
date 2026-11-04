@@ -98,7 +98,8 @@ func readKey(name string) (keyFile, error) {
 	return k, json.Unmarshal(b, &k)
 }
 
-// keys creates the test quote signer and the agent key, unless they already exist.
+// keys creates the test quote signer and the agent key, unless they already exist. The agent
+// key file names the vault account it signs for, so it is recreated when the vault changes.
 func keys(args []string) error {
 	fs := flag.NewFlagSet("keys", flag.ExitOnError)
 	vault := fs.String("vault", "", "vault account ID, e.g. vault.alice.testnet")
@@ -107,7 +108,7 @@ func keys(args []string) error {
 		return errors.New("-vault is required")
 	}
 	for _, f := range []struct{ name, account string }{{signerFile, "test-quote-signer"}, {agentFile, *vault}} {
-		if _, err := os.Stat(filepath.Join(dir, f.name)); err == nil {
+		if existing, err := readKey(f.name); err == nil && existing.AccountID == f.account {
 			continue
 		}
 		k, err := newKey(f.account)

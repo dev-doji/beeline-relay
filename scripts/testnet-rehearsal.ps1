@@ -29,6 +29,18 @@ $Allowed = '0x1111111111111111111111111111111111111111'   # allowlisted demo rec
 $Attacker = '0x6666666666666666666666666666666666666666'  # what a prompt-injected agent is told to pay
 $Net = @('network-config', 'testnet')
 
+if ($Owner -notmatch '^[a-z0-9_-]+(\.[a-z0-9_-]+)*\.testnet$' -or $Owner -eq 'yourname.testnet') {
+  throw "Use YOUR testnet account name, for example -Owner alice.testnet (not the placeholder 'yourname.testnet')."
+}
+
+# Stops the rehearsal when a required command fails, so later steps don't run on a broken setup.
+function Ensure($what, $code = $global:LASTEXITCODE) {
+  if ($code -ne 0) {
+    Write-Host "!! $what failed (see the error above). Fix it, then run the script again." -ForegroundColor Red
+    exit 1
+  }
+}
+
 function Step($n, $title) {
   Write-Host ''
   Write-Host "=== Step ${n}: $title ===" -ForegroundColor Cyan
@@ -65,20 +77,25 @@ foreach ($tool in 'near', 'gh', 'go') {
 
 Step 1 "Connect your testnet account ($Owner) to the NEAR CLI (a browser window asks you to approve)"
 & near account import-account using-web-wallet @Net
+Ensure 'Connecting your account'
 
 Step 2 "Create the vault account $Vault with 4 test NEAR from $Owner"
 & near account create-account fund-myself $Vault '4 NEAR' autogenerate-new-keypair save-to-keychain sign-as $Owner @Net sign-with-keychain send
+Ensure "Creating $Vault (if it already exists from an earlier run, use a new -Owner account)"
 
 Step 3 'Download the contract built by CI (agent_vault.wasm) from GitHub'
 $wasmDir = Join-Path $Work 'wasm'
 if (Test-Path $wasmDir) { Remove-Item -Recurse -Force $wasmDir }
 & gh run download --repo dev-doji/beeline-relay --name agent-vault-wasm --dir $wasmDir
+Ensure 'Downloading the contract'
 $Wasm = Join-Path $wasmDir 'agent_vault.wasm'
 
 Step 4 'Create the agent key and the TEST quote signer'
 Push-Location $Api
 $keys = & go run ./cmd/vault-testnet keys -vault $Vault
+$keysOk = $LASTEXITCODE
 Pop-Location
+Ensure 'Creating keys' $keysOk
 $Signer = ($keys | Select-String 'TEST_QUOTE_SIGNER=(.+)').Matches[0].Groups[1].Value
 $AgentPk = ($keys | Select-String 'AGENT_PUBLIC_KEY=(.+)').Matches[0].Groups[1].Value
 Write-Host "Test quote signer: $Signer"
@@ -91,6 +108,7 @@ $init = ArgsFile 'init' @{
   allowed_recipients = @($Allowed); allowed_destination_assets = @($DestAsset)
 }
 & near contract deploy $Vault use-file $Wasm with-init-call new file-args $init prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' @Net sign-with-keychain send
+Ensure 'Deploying the vault'
 
 Step 6 'Register the vault with the test USDC token and mint 20 test USDC into it'
 $reg = ArgsFile 'storage' @{ account_id = $Vault }
@@ -102,7 +120,7 @@ if (-not (Call $Token 'mint' $mint $Owner)) {
 
 Step 7 'Register the agent: the vault gives it a key that can ONLY call pay_quote'
 $agent = ArgsFile 'add-agent' @{ public_key = $AgentPk; label = 'invoice-agent' }
-Call $Vault 'add_agent' $agent $Owner | Out-Null
+if (-not (Call $Vault 'add_agent' $agent $Owner)) { Ensure 'Registering the agent' 1 }
 
 Push-Location $Api
 & go run ./cmd/vault-testnet quote -vault $Vault -recipient $Allowed -amount 1000000 -name allowed | Out-Host
