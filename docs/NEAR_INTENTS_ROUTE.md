@@ -137,6 +137,17 @@ Alternative or stretch: USDC on NEAR → USDC on Base, using the NEAR wallet sel
 
 Ordering: use `updatedAt` from the status response as the observation version. Never move backwards from a terminal state.
 
+## 6a. Live findings (2026-11-04, through the Beeline API, no funds moved)
+
+The route is USDC on NEAR → USDC on Base: `ORIGIN_CHAIN` deposit, `EXACT_INPUT`, 1 USDC.
+
+- **A non-dry quote works without a partner key.** It returned `depositAddress`, `signature`, `correlationId`, `amountOut` 997398, `minAmountOut` 987424 and `timeEstimate` 22 s.
+- **The NEAR-origin deposit address is a 64-hex implicit NEAR account.** The vault must `ft_transfer` USDC to that implicit account. Open: whether that account needs a USDC `storage_deposit` first. Check on Day 7.
+- **`refundTo` must be an existing NEAR account.** A well-formed but non-existent account returns **HTTP 400 `{"message":"Internal server error"}`**. Beeline should check that the account exists via NEAR RPC before quoting, so the error is clear.
+- **1Click rejects some recipients.** The burn address `0x…dEaD` returns 400 "recipient is not valid".
+- **1Click extends the deadline.** We requested 10 minutes and the provider returned `deadline` 3 days out. Beeline keeps the *stricter* 10-minute expiry for creating payments.
+- **The deadline format is not the cause of failures.** RFC 3339 with milliseconds and with nanoseconds were both accepted.
+
 ## 7. Open questions to settle on Day 1–2
 1. Is a partner JWT required for non-dry quotes or status in practice? (Dry quotes and status work without one today.)
 2. Where is the 1Click signing public key published, so we can verify quote signatures in Go?

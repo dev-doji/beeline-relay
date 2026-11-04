@@ -11,7 +11,9 @@ Agents retry, lose context and act unsupervised — dangerous when they move mon
 | Capability | Status |
 |---|---|
 | Go API skeleton, health endpoint, migrations | ✅ Implemented |
-| 1Click quote / payment sessions / idempotency | ⏳ In progress |
+| Live 1Click quotes, stored with provider signature and parameter fingerprint | ✅ Implemented; live quote fetched 2026-11-04 (no funds moved) |
+| Idempotent payment sessions (replay, conflict, concurrent retries), quote expiry, workspace isolation | ✅ Implemented and integration-tested on PostgreSQL |
+| Server-side state machine (no stale regressions, terminal states final) | ✅ Implemented and tested; reconciliation that drives it is ⏳ next |
 | On-chain agent vault (NEAR) | ⏳ Planned |
 | Live mainnet route (USDC NEAR → Base) | ❌ Not yet verified |
 | MCP server for agents | ⏳ Planned |
@@ -38,12 +40,32 @@ go run ./cmd/api
 curl http://localhost:8080/api/v1/health
 ```
 
-Run tests:
+Create a workspace and API keys (printed once, stored only as hashes):
+
+```bash
+cd beeline-api
+go run ./cmd/seed -name "Dev workspace"
+```
+
+Run tests. Integration tests run when `TEST_DATABASE_URL` points to a disposable database, and are skipped otherwise:
 
 ```bash
 cd beeline-api
 go test ./...
 ```
+
+## API so far
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/health` | – | Service and database health |
+| GET | `/api/v1/capabilities` | – | Configured routes and **route verification status** |
+| GET | `/api/v1/networks`, `/api/v1/assets?network=` | – | Supported networks and canonical asset IDs |
+| POST | `/api/v1/quotes` | Bearer | Live 1Click quote, stored immutably with signature and fingerprint |
+| GET | `/api/v1/quotes/{id}` | Bearer | Read a stored quote |
+| POST | `/api/v1/payments` | Bearer + `Idempotency-Key` | Create a payment from a quote: replay-safe, conflict-checked |
+| GET | `/api/v1/payments`, `/api/v1/payments/{id}` | Bearer | Workspace-scoped payments |
+| GET | `/api/v1/payments/{id}/events` | Bearer | Append-only event timeline |
 
 ## License
 

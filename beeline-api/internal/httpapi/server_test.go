@@ -10,6 +10,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/apperr"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
 )
 
 type fakePinger struct{ err error }
@@ -21,7 +24,26 @@ func newTestRouter(db Pinger) http.Handler {
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 		DB:             db,
 		AllowedOrigins: []string{"http://localhost:3000"},
+		Catalog:        catalog.Default(),
 	})
+}
+
+func TestProtectedRoutesRequireAuth(t *testing.T) {
+	for _, path := range []string{"/api/v1/payments", "/api/v1/quotes/qte_x", "/api/v1/payments/pay_x/events"} {
+		rec := httptest.NewRecorder()
+		newTestRouter(fakePinger{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("%s: status = %d, want 401", path, rec.Code)
+		}
+	}
+}
+
+func TestCapabilitiesNeverClaimsVerifiedByDefault(t *testing.T) {
+	rec := httptest.NewRecorder()
+	newTestRouter(fakePinger{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/capabilities", nil))
+	if strings.Contains(rec.Body.String(), `"status":"verified"`) {
+		t.Fatalf("capabilities claims a verified route without configuration: %s", rec.Body.String())
+	}
 }
 
 func TestHealthOK(t *testing.T) {
@@ -66,7 +88,7 @@ func TestUnknownRouteUsesErrorEnvelope(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
-	if rec.Code != http.StatusNotFound || body.Error.Code != CodeNotFound || body.Error.RequestID == "" {
+	if rec.Code != http.StatusNotFound || body.Error.Code != apperr.CodeNotFound || body.Error.RequestID == "" {
 		t.Fatalf("unexpected response %d %+v", rec.Code, body)
 	}
 }

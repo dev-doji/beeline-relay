@@ -16,7 +16,13 @@ import (
 )
 
 func Open(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(ctx, databaseURL)
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse database URL: %w", err)
+	}
+	// Return every timestamp in UTC regardless of server or session defaults.
+	cfg.ConnConfig.RuntimeParams["timezone"] = "UTC"
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
@@ -34,16 +40,19 @@ func Migrate(pool *pgxpool.Pool) error {
 		return fmt.Errorf("load migrations: %w", err)
 	}
 	db := stdlib.OpenDBFromPool(pool)
-	defer db.Close()
-
 	driver, err := migratepgx.WithInstance(db, &migratepgx.Config{})
 	if err != nil {
+		db.Close()
 		return fmt.Errorf("migration driver: %w", err)
 	}
 	m, err := migrate.NewWithInstance("iofs", src, "pgx5", driver)
 	if err != nil {
+		driver.Close()
 		return fmt.Errorf("migrator: %w", err)
 	}
+	// The driver holds a dedicated pool connection; Close returns it. Without this the
+	// connection leaks and pool.Close blocks forever on shutdown.
+	defer m.Close()
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("apply migrations: %w", err)
 	}

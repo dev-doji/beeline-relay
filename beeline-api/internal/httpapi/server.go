@@ -3,13 +3,21 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/apperr"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
 )
 
 // Pinger reports whether a dependency is reachable. The database pool satisfies it.
@@ -17,10 +25,28 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
+type Authenticator interface {
+	Authenticate(ctx context.Context, key string) (auth.Principal, error)
+}
+
+// RouteVerification is reported verbatim by /capabilities. It must only say "verified"
+// after a real end-to-end payment has been run and recorded.
+type RouteVerification struct {
+	Status         string     `json:"status"`
+	LastVerifiedAt *time.Time `json:"last_verified_at"`
+	Notes          string     `json:"notes"`
+}
+
 type Deps struct {
-	Logger         *slog.Logger
-	DB             Pinger
-	AllowedOrigins []string
+	Logger            *slog.Logger
+	DB                Pinger
+	AllowedOrigins    []string
+	Auth              Authenticator
+	Catalog           *catalog.Catalog
+	Quotes            *quote.Service
+	Payments          *payment.Service
+	Environment       string
+	RouteVerification RouteVerification
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -37,11 +63,25 @@ func NewRouter(d Deps) http.Handler {
 	}))
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, r, http.StatusNotFound, CodeNotFound, "Route not found.")
+		writeError(w, r, http.StatusNotFound, apperr.CodeNotFound, "Route not found.")
 	})
 
+	h := &handlers{d: d}
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", healthHandler(d.DB))
+		r.Get("/capabilities", h.capabilities)
+		r.Get("/networks", h.networks)
+		r.Get("/assets", h.assets)
+
+		r.Group(func(r chi.Router) {
+			r.Use(requireAuth(d.Auth, d.Logger))
+			r.Post("/quotes", h.createQuote)
+			r.Get("/quotes/{id}", h.getQuote)
+			r.Post("/payments", h.createPayment)
+			r.Get("/payments", h.listPayments)
+			r.Get("/payments/{id}", h.getPayment)
+			r.Get("/payments/{id}/events", h.paymentEvents)
+		})
 	})
 	return r
 }
@@ -61,6 +101,29 @@ func healthHandler(db Pinger) http.HandlerFunc {
 		writeJSON(w, code, map[string]any{
 			"status": status,
 			"checks": map[string]bool{"database": dbOK},
+		})
+	}
+}
+
+// requireAuth accepts "Authorization: Bearer blr_…" and stores the principal in the context.
+func requireAuth(a Authenticator, log *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			key, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+			if !ok || key == "" || a == nil {
+				writeError(w, r, http.StatusUnauthorized, apperr.CodeUnauthorized, "Missing or malformed Authorization header.")
+				return
+			}
+			p, err := a.Authenticate(r.Context(), strings.TrimSpace(key))
+			if errors.Is(err, auth.ErrInvalidKey) {
+				writeError(w, r, http.StatusUnauthorized, apperr.CodeUnauthorized, "Invalid or revoked API key.")
+				return
+			}
+			if err != nil {
+				writeAppError(w, r, log, err)
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
 		})
 	}
 }
@@ -90,7 +153,7 @@ func recoverer(log *slog.Logger) func(http.Handler) http.Handler {
 			defer func() {
 				if rec := recover(); rec != nil {
 					log.Error("panic", "request_id", middleware.GetReqID(r.Context()), "panic", rec)
-					writeError(w, r, http.StatusInternalServerError, CodeInternal, "Internal error.")
+					writeError(w, r, http.StatusInternalServerError, apperr.CodeInternal, "Internal error.")
 				}
 			}()
 			next.ServeHTTP(w, r)

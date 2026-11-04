@@ -14,8 +14,13 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/config"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/httpapi"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/storage"
 )
 
@@ -52,9 +57,26 @@ func run() error {
 		log.Info("migrations applied")
 	}
 
+	cat := catalog.Default()
+	provider := intents.NewClient(cfg.IntentsBaseURL, cfg.IntentsAPIKey, 15*time.Second)
+	router := httpapi.NewRouter(httpapi.Deps{
+		Logger:         log,
+		DB:             pool,
+		AllowedOrigins: cfg.CORSAllowedOrigins,
+		Auth:           &auth.Store{DB: pool},
+		Catalog:        cat,
+		Quotes:         &quote.Service{DB: pool, Provider: provider, Catalog: cat, Now: time.Now},
+		Payments:       &payment.Service{DB: pool, Now: time.Now},
+		Environment:    "mainnet",
+		RouteVerification: httpapi.RouteVerification{
+			Status: "not_verified",
+			Notes:  "No end-to-end payment has been run on this deployment yet. See docs/NEAR_INTENTS_ROUTE.md.",
+		},
+	})
+
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           httpapi.NewRouter(httpapi.Deps{Logger: log, DB: pool, AllowedOrigins: cfg.CORSAllowedOrigins}),
+		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
