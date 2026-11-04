@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ var pool *pgxpool.Pool
 
 func TestMain(m *testing.M) {
 	_ = godotenv.Load("../../.env")
-	url := os.Getenv("TEST_DATABASE_URL")
+	url := strings.TrimSpace(os.Getenv("TEST_DATABASE_URL"))
 	if url == "" {
 		// Unit-test-only runs (and forks without the secret) skip integration tests.
 		os.Exit(0)
