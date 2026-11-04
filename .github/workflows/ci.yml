@@ -34,6 +34,30 @@ jobs:
       - name: build
         run: go build ./...
 
+  vault:
+    name: Agent vault contract
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/agent-vault
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/agent-vault
+      - name: rustfmt
+        run: cargo fmt --check
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: unit tests (includes live 1Click signature fixture)
+        run: cargo test
+      - name: wasm build
+        run: cargo build --target wasm32-unknown-unknown --release
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

@@ -14,7 +14,8 @@ Agents retry, lose context and act unsupervised — dangerous when they move mon
 | Live 1Click quotes, stored with provider signature and parameter fingerprint | ✅ Implemented; live quote fetched 2026-11-04 (no funds moved) |
 | Idempotent payment sessions (replay, conflict, concurrent retries), quote expiry, workspace isolation | ✅ Implemented and integration-tested on PostgreSQL |
 | Server-side state machine (no stale regressions, terminal states final) | ✅ Implemented and tested; reconciliation that drives it is ⏳ next |
-| On-chain agent vault (NEAR) | ⏳ Planned |
+| 1Click quote signature verification (Go and on-chain) | ✅ Implemented; verified against a real 1Click quote and key |
+| On-chain agent vault (NEAR): allowlist, signed-quote check, limits, single-use deposits, revocable agent keys | ✅ Implemented and unit-tested (23 tests); ❌ not yet deployed or audited |
 | Live mainnet route (USDC NEAR → Base) | ❌ Not yet verified |
 | MCP server for agents | ⏳ Planned |
 | Developer console | ⏳ Planned |
@@ -25,6 +26,7 @@ This table is updated as work lands. Nothing is marked live until a real end-to-
 
 ```text
 beeline-api/     Go API (chi, PostgreSQL, slog)
+contracts/       NEAR agent vault contract (Rust, near-sdk)
 docs/            Product spec, provider research, plan
 AGENTS.md        Rules for coding agents working in this repo
 ```
