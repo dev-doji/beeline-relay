@@ -55,8 +55,19 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: unit tests (includes live 1Click signature fixture)
         run: cargo test
-      - name: wasm build
-        run: cargo build --target wasm32-unknown-unknown --release
+      - name: install cargo-near
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/latest/download/cargo-near-installer.sh | sh
+      - name: optimized wasm build
+        run: |
+          cargo near build non-reproducible-wasm
+          ls -l target/near/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-vault-wasm
+          path: |
+            contracts/agent-vault/target/near/agent_vault.wasm
+            contracts/agent-vault/target/near/agent_vault_abi.json
+          if-no-files-found: error
 
   secrets:
     name: Secret scan
