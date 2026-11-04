@@ -5,6 +5,9 @@
 *.pem
 *.key
 
+# Testnet rehearsal keys (generated locally, testnet only)
+.testnet/
+
 # Go
 beeline-api/bin/
 *.exe
