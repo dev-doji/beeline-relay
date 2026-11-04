@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Go
+beeline-api/bin/
+*.exe
+*.test
+coverage.out
+
+# Node
+node_modules/
+.next/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Rust / NEAR
+target/
+contracts/**/res/
+neardev/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
