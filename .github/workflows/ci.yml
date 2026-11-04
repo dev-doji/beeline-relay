@@ -16,8 +16,8 @@ jobs:
       run:
         working-directory: beeline-api
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: beeline-api/go.mod
           cache-dependency-path: beeline-api/go.sum
@@ -34,9 +34,10 @@ jobs:
     name: Secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Scan the full history with the gitleaks CLI. The gitleaks GitHub action
+      # fails on a repository's first push because the root commit has no parent.
+      - name: gitleaks
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.24.3 git /repo --redact --verbose --exit-code 1
