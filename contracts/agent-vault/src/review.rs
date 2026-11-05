@@ -167,3 +167,55 @@ pub fn verify(
     }
     Err("AI reviewer did not approve this quote".into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use near_sdk::test_utils::VMContextBuilder;
+    use near_sdk::testing_env;
+
+    /// A review produced by the Go client (beeline-api/internal/nearai) with a test key. The
+    /// vault's own verification must accept it, proving the two implementations agree.
+    #[test]
+    fn accepts_review_built_by_the_go_client() {
+        testing_env!(VMContextBuilder::new().build());
+        let f: Value =
+            near_sdk::serde_json::from_str(include_str!("testdata/go_review.json")).unwrap();
+        let s = |k: &str| f[k].as_str().unwrap().to_string();
+        let reviewer = Reviewer {
+            model: s("model"),
+            signing_key: from_hex::<32>(&s("signing_key")).unwrap(),
+            policy_prompt_sha256: from_hex::<32>(&s("policy_sha256")).unwrap(),
+            threshold: 1,
+        };
+        let review = Review {
+            request: f["review"]["request"].as_str().unwrap().into(),
+            response: f["review"]["response"].as_str().unwrap().into(),
+            signature: f["review"]["signature"].as_str().unwrap().into(),
+        };
+        let created = f["created"].as_u64().unwrap();
+        let approval = verify(
+            &review,
+            &reviewer,
+            &s("quote_json"),
+            &s("quote_hash"),
+            created + 60,
+            900,
+        )
+        .expect("the vault must accept a review built by the Go client");
+        assert_eq!(approval.request_sha256.len(), 64);
+
+        // The same review cannot approve a different quote.
+        let err = verify(
+            &review,
+            &reviewer,
+            &s("quote_json"),
+            "OTHER",
+            created + 60,
+            900,
+        )
+        .err()
+        .unwrap();
+        assert!(err.contains("did not approve"), "{err}");
+    }
+}
