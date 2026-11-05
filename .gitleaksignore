@@ -1,0 +1,3 @@
+# Revoked NEAR AI key accidentally committed in bf24609 and removed in 5eb0be0.
+# It was revoked on 2026-11-05 (NEAR AI returns 401 for it).
+bf24609d4e72da6d43f85142b52b33673f25b581:.env.example:near-ai-api-key:15
