@@ -24,9 +24,9 @@
   --radius: 18px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --display: var(--font-display), "Space Grotesk", system-ui, sans-serif;
-  --sans: var(--font-sans), "IBM Plex Sans", system-ui, sans-serif;
-  --mono: var(--font-mono), ui-monospace, Menlo, Consolas, monospace;
+  --display: "Space Grotesk", system-ui, sans-serif;
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -264,3 +264,67 @@ pre.answer { white-space: pre-wrap; font-family: var(--mono); font-size: 12.5px;
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }
 .small { font-size: 13.5px; }
+
+/* ---------- Vendor & pay pages ---------- */
+.page-head { padding: 18px 0 8px; }
+.page-head h1 { font-family: var(--display); font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.03em; margin: 10px 0 6px; }
+.page-head p { color: var(--muted); margin: 0; max-width: 640px; }
+.split { display: grid; grid-template-columns: 1fr 440px; gap: 22px; align-items: start; padding: 18px 0 60px; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: grid; gap: 14px; }
+.panel h2 { font-family: var(--display); font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+.field { display: grid; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--muted); }
+.field input, .field textarea { font: inherit; font-size: 16px; color: var(--text); background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; width: 100%; min-height: 44px; }
+.field input:focus, .field textarea:focus { outline: none; border-color: var(--honey); box-shadow: 0 0 0 4px var(--honey-soft); }
+.field .help { font-weight: 400; color: var(--faint); font-size: 12.5px; }
+.field .err { font-weight: 500; color: var(--bad); font-size: 12.5px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.items { display: grid; gap: 8px; }
+.item-row { display: grid; grid-template-columns: 1fr 76px 104px 40px; gap: 8px; align-items: end; }
+.item-row input { min-height: 44px; }
+.ghost { background: transparent; border: 1px dashed var(--line-2); color: var(--muted); }
+.ghost:hover { color: var(--text); background: var(--card-2); }
+
+.receipt { background: #fbf8f1; color: #16130c; border-radius: 20px; padding: 22px; position: relative; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.4); animation: rise .5s var(--ease-out) both; }
+.receipt::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 14px;
+  background: radial-gradient(circle at 10px 14px, var(--bg) 9px, transparent 10px) repeat-x; background-size: 20px 14px; }
+.receipt .vendor { display: flex; gap: 12px; align-items: center; }
+.receipt .initials { width: 46px; height: 46px; border-radius: 14px; background: #16130c; color: var(--honey); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 18px; }
+.receipt .vendor b { font-family: var(--display); font-size: 19px; letter-spacing: -0.01em; display: block; }
+.receipt .vendor span { color: #6b6455; font-size: 13.5px; }
+.receipt .meta { display: flex; justify-content: space-between; gap: 10px; color: #6b6455; font-size: 12.5px; margin: 16px 0 10px; font-family: var(--mono); flex-wrap: wrap; }
+.receipt table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.receipt td { padding: 8px 0; border-top: 1px dashed #d9d2c2; }
+.receipt td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt .total { display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid #16130c; margin-top: 6px; padding-top: 12px; }
+.receipt .total span { font-weight: 600; }
+.receipt .total b { font-family: var(--display); font-size: 30px; letter-spacing: -0.03em; }
+.receipt .total b small { font-size: 14px; color: #6b6455; margin-left: 4px; }
+.receipt .payto { margin-top: 12px; font-size: 13px; color: #6b6455; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.receipt .payto code { color: #16130c; }
+.receipt .sigline { margin-top: 14px; display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: #3f6b4f; font-weight: 600; }
+.receipt .rstamp { position: absolute; right: 18px; top: 18px; font-family: var(--display); font-weight: 700; letter-spacing: .1em; font-size: 22px; padding: 4px 14px; border: 3px solid currentColor;
+  border-radius: 12px; transform: rotate(-10deg); }
+.receipt .rstamp.paid { color: #15803d; animation: stamp .5s var(--ease-back) both; }
+.receipt .rstamp.open { color: #a16207; font-size: 15px; opacity: .8; }
+
+.share { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.qr { background: #fff; padding: 10px; border-radius: 14px; line-height: 0; }
+.linkbox { display: flex; gap: 8px; align-items: center; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 12px; min-width: 0; }
+.linkbox code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; color: var(--muted); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.pay-wrap { max-width: 640px; margin: 0 auto; padding: 10px 16px 60px; display: grid; gap: 16px; }
+.lab { background: var(--card); border: 1px dashed rgba(251,113,133,.45); border-radius: var(--radius); padding: 16px; display: grid; gap: 10px; }
+.lab h3 { margin: 0; font-family: var(--display); font-size: 16px; display: flex; gap: 8px; align-items: center; }
+.lab p { margin: 0; color: var(--muted); font-size: 14px; }
+.attempt-list { display: grid; gap: 6px; }
+.attempt { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; padding: 8px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+
+@media (max-width: 900px) {
+  .split { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .row2 { grid-template-columns: 1fr; }
+  .item-row { grid-template-columns: 1fr 64px 92px 40px; }
+  .share { grid-template-columns: 1fr; justify-items: center; }
+}

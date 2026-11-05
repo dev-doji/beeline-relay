@@ -141,6 +141,7 @@ export const LAYER_LABEL: Record<string, string> = {
   spend_limit: "Spend limit",
   single_use: "Single-use quote",
   ai_reviewer: "AI reviewer",
+  invoice: "Signed invoice check",
   vault_policy: "Vault policy",
 };
 
@@ -150,3 +151,52 @@ export function reviewScope(threshold: string): string {
 }
 
 export const shortKey = (s: string, n = 6) => (s.length > n * 2 + 1 ? `${s.slice(0, n)}…${s.slice(-n)}` : s);
+
+/* ---------------- Vendor invoices (pay links) ---------------- */
+
+export interface InvoiceItem {
+  name: string;
+  quantity: number;
+  unit_price: string; // base units
+}
+
+export interface Invoice {
+  id: string;
+  vendor_name: string;
+  vendor_handle: string;
+  payout: string;
+  asset: string;
+  amount: string;
+  memo: string;
+  items: InvoiceItem[];
+  payload: string;
+  signature: string;
+  status: "open" | "paid";
+  paid_tx: string | null;
+  paid_at: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface CreateInvoiceInput {
+  vendor_name: string;
+  vendor_handle: string;
+  payout: string;
+  memo: string;
+  items: InvoiceItem[];
+}
+
+export type Tamper = "none" | "swap_payout" | "edit_amount";
+
+export const createInvoice = (input: CreateInvoiceInput) =>
+  request<Invoice>("/api/v1/playground/invoices", { method: "POST", body: JSON.stringify(input) });
+
+export const getInvoice = (id: string) => request<Invoice>(`/api/v1/playground/invoices/${encodeURIComponent(id)}`);
+
+export const payInvoice = (id: string, tamper: Tamper) =>
+  request<{ invoice: Invoice; run: RunResult }>(`/api/v1/playground/invoices/${encodeURIComponent(id)}/pay`, {
+    method: "POST",
+    body: JSON.stringify({ tamper }),
+  });
+
+export const DEMO_VENDOR_PAYOUT = "0x7777777777777777777777777777777777777777";

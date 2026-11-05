@@ -1,13 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import { REPO_URL } from "@/lib/api";
 import { BeeMark } from "@/components/BeeMark";
 
-const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", display: "swap" });
-const sans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Beeline: guardrails for AI agent payments on NEAR",
@@ -19,7 +15,17 @@ export const viewport: Viewport = { themeColor: "#0b1020", width: "device-width"
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="en">
+      <head>
+        {/* Loaded by the browser (not at build time), so builds never depend on a font download. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+        />
+      </head>
       <body>
         <header className="wrap nav">
           <Link href="/" className="brand" aria-label="Beeline home">
@@ -28,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </Link>
           <nav className="nav-links" aria-label="Main">
             <Link href="/playground">Playground</Link>
+            <Link href="/vendor">Vendors</Link>
             <a href={REPO_URL} target="_blank" rel="noreferrer">
               GitHub
             </a>

@@ -24,11 +24,11 @@ import { formatUSDC, shortKey } from "@/lib/api";
 
 /* ---------------- Quote receipt ---------------- */
 
-export function QuoteCard({ step, state, delay = 0 }: { step: Step; state: PlaygroundState | null; delay?: number }) {
+export function QuoteCard({ step, state, delay = 0, payeeLabel }: { step: Step; state: PlaygroundState | null; delay?: number; payeeLabel?: string }) {
   const d = step.data ?? {};
   const recipient = String(d.recipient ?? "");
   const amount = String(d.amount ?? "");
-  const allowed = state?.recipients?.includes(recipient);
+  const allowed = payeeLabel ? undefined : state?.recipients?.includes(recipient);
   const forged = step.detail.includes("throwaway key");
   return (
     <div className="rcard" style={{ animationDelay: `${delay}ms` }}>
@@ -58,12 +58,16 @@ export function QuoteCard({ step, state, delay = 0 }: { step: Step; state: Playg
           </div>
           <div className="party">
             <small>To (on Base)</small>
-            <div>{allowed ? state?.allowed_recipient.label ?? "Approved recipient" : recipient === state?.attacker_recipient.address ? "Unknown address" : "Recipient"}</div>
+            <div>{payeeLabel ?? (allowed ? state?.allowed_recipient.label ?? "Approved recipient" : recipient === state?.attacker_recipient.address ? "Unknown address" : "Recipient")}</div>
             <div className="mono">{shortKey(recipient, 6)}</div>
           </div>
         </div>
         <div className="receipt-meta">
-          {allowed ? (
+          {payeeLabel ? (
+            <span className={`pill ${payeeLabel.startsWith("Scammer") ? "pill-bad" : "pill-honey"}`}>
+              <Receipt size={13} aria-hidden /> Paying a vendor invoice
+            </span>
+          ) : allowed ? (
             <span className="pill pill-ok">
               <Check size={13} aria-hidden /> On your approved list
             </span>
@@ -187,11 +191,12 @@ function failedRung(result: RunResult): string | null {
   if (result.outcome !== "blocked") return null;
   const r = result.reason;
   if (result.layer === "spend_limit") return r.includes("daily budget") ? "daily" : "limit";
+  if (result.layer === "invoice") return "allowlist";
   if (result.layer === "vault_policy") return null;
   return result.layer ?? null;
 }
 
-export function VaultCard({ result, reviewStep, delay = 0 }: { result: RunResult; reviewStep?: Step; delay?: number }) {
+export function VaultCard({ result, reviewStep, delay = 0, invoiceMode = false }: { result: RunResult; reviewStep?: Step; delay?: number; invoiceMode?: boolean }) {
   const vault = result.steps.find((s) => s.key === "vault");
   const failed = failedRung(result);
   const failIndex = failed ? RUNGS.findIndex((r) => r.id === failed) : -1;
@@ -235,7 +240,7 @@ export function VaultCard({ result, reviewStep, delay = 0 }: { result: RunResult
                   <span className="ic" aria-hidden>
                     {cls === "pass" ? <Check size={13} /> : cls === "fail" ? <X size={13} /> : <Minus size={13} />}
                   </span>
-                  {r.label}
+                  {invoiceMode && r.id === "allowlist" ? "Genuine invoice: payee and amount match, unpaid" : r.label}
                   {why && <span className="why">{why}</span>}
                 </li>
               );

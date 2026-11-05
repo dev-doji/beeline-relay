@@ -238,7 +238,7 @@ export function Chat() {
 
 /* ---------------- Messages ---------------- */
 
-function BotFrame({ children }: { children: React.ReactNode }) {
+export function BotFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="msg bot">
       <span className="avatar small" aria-hidden>
@@ -354,7 +354,7 @@ function replyText(r: RunResult): string {
   return `I couldn’t finish this one: ${r.reason}.`;
 }
 
-function Thinking({ summary, reviewExpected }: { summary: string; reviewExpected: boolean }) {
+export function Thinking({ summary, reviewExpected }: { summary: string; reviewExpected: boolean }) {
   const [t, setT] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setT((x) => x + 1), 1000);
@@ -391,7 +391,7 @@ function Thinking({ summary, reviewExpected }: { summary: string; reviewExpected
   );
 }
 
-function Typewriter({ text }: { text: string }) {
+export function Typewriter({ text }: { text: string }) {
   const [n, setN] = useState(0);
   useEffect(() => {
     if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {

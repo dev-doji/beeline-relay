@@ -56,7 +56,11 @@ jobs:
       - name: unit tests (includes live 1Click signature fixture)
         run: cargo test
       - name: install cargo-near
-        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/latest/download/cargo-near-installer.sh | sh
+        # Pinned release, with retries: GitHub release downloads occasionally return 5xx.
+        run: |
+          set -o pipefail
+          curl --proto '=https' --tlsv1.2 -LsSf --retry 5 --retry-all-errors --retry-delay 5             https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh | sh
+          cargo near --version
       - name: optimized wasm build
         run: |
           cargo near build non-reproducible-wasm
