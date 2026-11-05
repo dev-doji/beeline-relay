@@ -116,13 +116,17 @@ $init = ArgsFile 'init' @{
 & near contract deploy $Vault use-file $Wasm with-init-call new file-args $init prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' @Net sign-with-keychain send
 Ensure 'Deploying the vault'
 
-Step 6 'Register the vault with the test USDC token and mint 20 test USDC into it'
+Step 6 'Register the vault with the test USDC token, mint 20 test USDC into it, and credit it to the pool'
 $reg = ArgsFile 'storage' @{ account_id = $Vault }
 Call $Token 'storage_deposit' $reg $Owner '0.00125 NEAR' | Out-Null
 $mint = ArgsFile 'mint' @{ account_id = $Vault; amount = '20000000' }
 if (-not (Call $Token 'mint' $mint $Owner)) {
   Write-Host "Minting failed. Send test USDC to $Vault another way, then continue." -ForegroundColor Yellow
 }
+# Minted tokens arrive without ft_transfer_call, so the vault credits them to its pool only now.
+$empty = ArgsFile 'empty' @{}
+if (-not (Call $Vault 'sync_balance' $empty $Owner)) { Ensure 'Crediting the minted USDC to the vault pool' 1 }
+& near contract call-function as-read-only $Vault get_balances json-args '{}' @Net now
 
 Step 7 'Register the agent: the vault gives it a key that can ONLY call pay_quote'
 $agent = ArgsFile 'add-agent' @{ public_key = $AgentPk; label = 'invoice-agent' }

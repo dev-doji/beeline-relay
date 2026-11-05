@@ -154,7 +154,24 @@ fn setup() -> AgentVault {
         vec![DEST_ASSET.to_string()],
     );
     let _ = v.add_agent(agent_key(1), "invoice-agent".into());
+    fund_pool(&mut v, POOL);
     v
+}
+
+/// Owner's general funds deposited in `setup`.
+const POOL: u128 = 100_000_000;
+
+/// Simulates the token contract calling `ft_on_transfer` after an `ft_transfer_call`.
+fn token_transfer_call(v: &mut AgentVault, sender: &str, amount: u128, msg: &str) {
+    testing_env!(context(TOKEN, agent_key(99), T0).build());
+    assert_eq!(
+        v.ft_on_transfer(sender.parse().unwrap(), U128(amount), msg.into()),
+        U128(0)
+    );
+}
+
+fn fund_pool(v: &mut AgentVault, amount: u128) {
+    token_transfer_call(v, OWNER, amount, "");
 }
 
 /// Runs f and returns the panic message, or "" if it did not panic.
@@ -171,7 +188,7 @@ fn rejection<F: FnOnce()>(f: F) -> String {
 
 fn assert_rejected(v: &mut AgentVault, json: String, needle: &str) {
     let msg = rejection(|| {
-        let _ = v.pay_quote(json, None);
+        let _ = v.pay_quote(json, None, None);
     });
     assert!(
         msg.contains(needle),
@@ -183,7 +200,7 @@ fn assert_rejected(v: &mut AgentVault, json: String, needle: &str) {
 fn pays_valid_quote_and_records_spend() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
 
     let (_, agent) = v.get_agents().into_iter().next().unwrap();
     assert_eq!(agent.spent_today, U128(1_000_000));
@@ -266,7 +283,7 @@ fn enforces_per_payment_limit() {
 fn enforces_daily_budget_and_resets_next_day() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None);
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None, None);
 
     let mut second = Q::new(4_000_000, DEPOSIT_2);
     second.issued = T0 + 2 * MIN;
@@ -278,7 +295,7 @@ fn enforces_daily_budget_and_resets_next_day() {
     second.issued = next_day;
     second.deadline = next_day + 60 * MIN;
     as_agent(1, next_day + MIN);
-    let _ = v.pay_quote(second.signed(), None);
+    let _ = v.pay_quote(second.signed(), None, None);
     let (_, agent) = v.get_agents().into_iter().next().unwrap();
     assert_eq!(agent.spent_today, U128(4_000_000));
     assert_eq!(agent.total_spent, U128(9_000_000));
@@ -290,9 +307,9 @@ fn budgets_are_per_agent() {
     as_owner(T0);
     let _ = v.add_agent(agent_key(2), "second-agent".into());
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None);
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None, None);
     as_agent(2, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_2).signed(), None);
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_2).signed(), None, None);
 }
 
 #[test]
@@ -300,7 +317,7 @@ fn deposit_address_can_only_be_paid_once() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
     let json = Q::new(1_000_000, DEPOSIT_1).signed();
-    let _ = v.pay_quote(json.clone(), None);
+    let _ = v.pay_quote(json.clone(), None, None);
     assert_rejected(&mut v, json, "already been paid");
 }
 
@@ -408,7 +425,7 @@ fn paused_vault_pays_nothing() {
 fn failed_transfer_restores_budget_and_deposit() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
 
     testing_env!(
         context(VAULT, agent_key(1), T0 + MIN).build(),
@@ -421,7 +438,8 @@ fn failed_transfer_restores_budget_and_deposit() {
         agent_key(1),
         DEPOSIT_1.into(),
         U128(1_000_000),
-        T0 / NS_PER_DAY
+        T0 / NS_PER_DAY,
+        None
     ));
     let (_, agent) = v.get_agents().into_iter().next().unwrap();
     assert_eq!(agent.spent_today, U128(0));
@@ -433,7 +451,7 @@ fn failed_transfer_restores_budget_and_deposit() {
 fn successful_transfer_keeps_bookkeeping() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
     testing_env!(
         context(VAULT, agent_key(1), T0 + MIN).build(),
         near_sdk::test_vm_config(),
@@ -445,7 +463,8 @@ fn successful_transfer_keeps_bookkeeping() {
         agent_key(1),
         DEPOSIT_1.into(),
         U128(1_000_000),
-        T0 / NS_PER_DAY
+        T0 / NS_PER_DAY,
+        None
     ));
     assert!(v.is_deposit_used(DEPOSIT_1.into()));
 }
@@ -544,7 +563,7 @@ fn setup_reviewed() -> AgentVault {
 
 fn assert_review_rejected(v: &mut AgentVault, json: String, review: Review, needle: &str) {
     let msg = rejection(|| {
-        let _ = v.pay_quote(json, Some(review));
+        let _ = v.pay_quote(json, Some(review), None);
     });
     assert!(
         msg.contains(needle),
@@ -556,7 +575,7 @@ fn assert_review_rejected(v: &mut AgentVault, json: String, review: Review, need
 fn small_payments_skip_review() {
     let mut v = setup_reviewed();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
     assert!(v.is_deposit_used(DEPOSIT_1.into()));
 }
 
@@ -576,7 +595,7 @@ fn approved_review_pays_and_is_logged() {
     let mut v = setup_reviewed();
     as_agent(1, T0 + MIN);
     let json = Q::new(3_000_000, DEPOSIT_1).signed();
-    let _ = v.pay_quote(json.clone(), Some(R::approving(&json).build()));
+    let _ = v.pay_quote(json.clone(), Some(R::approving(&json).build()), None);
     assert!(v.is_deposit_used(DEPOSIT_1.into()));
     assert!(get_logs()
         .iter()
@@ -680,4 +699,417 @@ fn reviewer_is_owner_managed_and_visible() {
     as_owner(T0);
     v.clear_reviewer();
     assert!(v.get_reviewer().is_none());
+}
+
+// --- Swarm job escrow ------------------------------------------------------------------------
+//
+// A hirer escrows a job budget; three agents are registered, two of them members of the job.
+
+const HIRER: &str = "hirer.test.near";
+const OTHER_ALLOWED: &str = "0x2222222222222222222222222222222222222222";
+const DEPOSIT_3: &str = "d4c422d4dfcdfdeca766ac4a69a4a6ca46991ae496cabdf4f9a75f399979bb3d";
+const JOB: &str = "job-1";
+const JOB_BUDGET: u128 = 5_000_000;
+const JOB_CAP: u128 = 3_000_000;
+const DAY_SECS: u64 = 86_400;
+
+fn fund_msg(job: &str) -> String {
+    format!("{{\"fund_job\":\"{job}\"}}")
+}
+
+fn member(seed: u8, cap: u128) -> JobMemberInput {
+    JobMemberInput {
+        public_key: agent_key(seed),
+        cap: U128(cap),
+    }
+}
+
+fn setup_job() -> AgentVault {
+    let mut v = setup();
+    as_owner(T0);
+    let _ = v.add_agent(agent_key(2), "research-agent".into());
+    let _ = v.add_agent(agent_key(3), "outsider-agent".into());
+    v.add_recipient(OTHER_ALLOWED.into());
+    v.create_job(
+        JOB.into(),
+        HIRER.parse().unwrap(),
+        vec![member(1, JOB_CAP), member(2, JOB_CAP)],
+        vec![ALLOWED.into()],
+        secs(T0) + DAY_SECS,
+    );
+    token_transfer_call(&mut v, HIRER, JOB_BUDGET, &fund_msg(JOB));
+    v
+}
+
+fn pay_job(v: &mut AgentVault, seed: u8, amount: u128, deposit: &str) {
+    as_agent(seed, T0 + MIN);
+    let _ = v.pay_quote(Q::new(amount, deposit).signed(), None, Some(JOB.into()));
+}
+
+fn assert_job_rejected(v: &mut AgentVault, seed: u8, q: Q, needle: &str) {
+    as_agent(seed, T0 + MIN);
+    let msg = rejection(|| {
+        let _ = v.pay_quote(q.signed(), None, Some(JOB.into()));
+    });
+    assert!(
+        msg.contains(needle),
+        "expected rejection containing {needle:?}, got {msg:?}"
+    );
+}
+
+fn balances(v: &AgentVault) -> (u128, u128, u128) {
+    let b = v.get_balances();
+    (b.pool.0, b.escrowed.0, b.in_flight.0)
+}
+
+fn job(v: &AgentVault) -> Job {
+    v.get_job(JOB.into()).unwrap()
+}
+
+fn callback_env(result: PromiseResult) {
+    testing_env!(
+        context(VAULT, agent_key(99), T0 + MIN).build(),
+        near_sdk::test_vm_config(),
+        RuntimeFeesConfig::test(),
+        Default::default(),
+        vec![result],
+    );
+}
+
+fn as_account(account: &str, now: u64) {
+    testing_env!(context(account, agent_key(98), now).build());
+}
+
+#[test]
+fn job_payment_draws_from_escrow_not_pool() {
+    let mut v = setup_job();
+    assert_eq!(balances(&v), (POOL, JOB_BUDGET, 0));
+    pay_job(&mut v, 1, 2_000_000, DEPOSIT_1);
+
+    assert_eq!(balances(&v), (POOL, JOB_BUDGET - 2_000_000, 2_000_000));
+    let j = job(&v);
+    assert_eq!(j.balance, U128(3_000_000));
+    assert_eq!(j.spent, U128(2_000_000));
+    assert_eq!(j.members[0].spent, U128(2_000_000));
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("payment_requested") && l.contains(JOB)));
+
+    callback_env(PromiseResult::Successful(vec![]));
+    assert!(v.on_transfer_complete(
+        agent_key(1),
+        DEPOSIT_1.into(),
+        U128(2_000_000),
+        T0 / NS_PER_DAY,
+        Some(JOB.into())
+    ));
+    assert_eq!(balances(&v), (POOL, 3_000_000, 0));
+}
+
+#[test]
+fn non_member_cannot_spend_job_funds() {
+    let mut v = setup_job();
+    // Agent 3 is an active vault agent, but not in this job's swarm.
+    assert_job_rejected(
+        &mut v,
+        3,
+        Q::new(1_000_000, DEPOSIT_1),
+        "not a member of job",
+    );
+}
+
+#[test]
+fn each_member_is_held_to_its_job_cap() {
+    let mut v = setup_job();
+    pay_job(&mut v, 1, JOB_CAP, DEPOSIT_1);
+    assert_job_rejected(
+        &mut v,
+        1,
+        Q::new(1_000_000, DEPOSIT_2),
+        "cap for job job-1 exceeded",
+    );
+}
+
+#[test]
+fn job_budget_is_shared_by_the_swarm() {
+    let mut v = setup_job();
+    pay_job(&mut v, 1, 3_000_000, DEPOSIT_1);
+    // Agent 2 is within its own cap, but only 2 USDC is left in escrow.
+    assert_job_rejected(
+        &mut v,
+        2,
+        Q::new(3_000_000, DEPOSIT_2),
+        "has 2000000 left in escrow",
+    );
+    pay_job(&mut v, 2, 2_000_000, DEPOSIT_3);
+    assert_eq!(job(&v).balance, U128(0));
+}
+
+#[test]
+fn job_recipients_narrow_the_allowlist() {
+    let mut v = setup_job();
+    let mut q = Q::new(1_000_000, DEPOSIT_1);
+    q.recipient = OTHER_ALLOWED.into();
+    // Allowed by the vault, but not by this job.
+    assert_job_rejected(&mut v, 1, q.clone(), "is not allowed for job job-1");
+    // The vault's allowlist still applies to job payments.
+    let mut attacker = Q::new(1_000_000, DEPOSIT_1);
+    attacker.recipient = ATTACKER.into();
+    assert_job_rejected(&mut v, 1, attacker, "is not on the allowlist");
+    // The same recipient is fine for an ordinary pool payment.
+    as_agent(1, T0 + MIN);
+    let _ = v.pay_quote(q.signed(), None, None);
+    assert!(v.is_deposit_used(DEPOSIT_1.into()));
+}
+
+#[test]
+fn job_payments_still_obey_vault_limits() {
+    let mut v = setup_job();
+    as_owner(T0);
+    v.set_limits(U128(1_000_000), U128(8_000_000));
+    assert_job_rejected(&mut v, 1, Q::new(2_000_000, DEPOSIT_1), "per-payment limit");
+}
+
+#[test]
+fn pool_payments_and_withdrawals_cannot_touch_escrow() {
+    let mut v = setup_job();
+    as_owner(T0);
+    let _ = v.withdraw(U128(POOL), OWNER.parse().unwrap());
+    assert_eq!(balances(&v), (0, JOB_BUDGET, POOL));
+
+    as_agent(1, T0 + MIN);
+    assert_rejected(
+        &mut v,
+        Q::new(1_000_000, DEPOSIT_1).signed(),
+        "pool has 0 available",
+    );
+
+    as_owner(T0);
+    assert!(rejection(|| {
+        let _ = v.withdraw(U128(1), OWNER.parse().unwrap());
+    })
+    .contains("not withdrawable"));
+}
+
+#[test]
+fn failed_withdrawal_returns_to_pool() {
+    let mut v = setup();
+    as_owner(T0);
+    let _ = v.withdraw(U128(1_000_000), OWNER.parse().unwrap());
+    callback_env(PromiseResult::Failed);
+    assert!(!v.on_withdraw_complete(U128(1_000_000)));
+    assert_eq!(balances(&v), (POOL, 0, 0));
+}
+
+fn try_fund(v: &mut AgentVault, sender: &str, msg: &str) -> String {
+    rejection(|| token_transfer_call(v, sender, 1_000_000, msg))
+}
+
+#[test]
+fn only_the_funder_can_fund_an_open_job() {
+    let mut v = setup_job();
+    assert!(try_fund(&mut v, "stranger.near", &fund_msg(JOB)).contains("only the job's funder"));
+    assert!(try_fund(&mut v, HIRER, &fund_msg("nope")).contains("unknown job"));
+    assert!(try_fund(&mut v, HIRER, "pay me").contains("msg must be empty"));
+
+    // Another token cannot be deposited at all.
+    testing_env!(context("fake-usdc.near", agent_key(99), T0).build());
+    assert!(rejection(|| {
+        v.ft_on_transfer(HIRER.parse().unwrap(), U128(1), fund_msg(JOB));
+    })
+    .contains("only the vault's token"));
+
+    as_account(HIRER, T0);
+    v.close_job(JOB.into());
+    assert!(try_fund(&mut v, HIRER, &fund_msg(JOB)).contains("closed or expired"));
+}
+
+fn try_create(
+    v: &mut AgentVault,
+    id: &str,
+    members: Vec<JobMemberInput>,
+    recipients: Vec<String>,
+    exp: u64,
+) -> String {
+    rejection(|| v.create_job(id.into(), HIRER.parse().unwrap(), members, recipients, exp))
+}
+
+#[test]
+fn create_job_validates_members_and_recipients() {
+    let mut v = setup_job();
+    as_owner(T0);
+    let exp = secs(T0) + DAY_SECS;
+    assert!(try_create(&mut v, JOB, vec![member(1, 1)], vec![], exp).contains("already exists"));
+    assert!(
+        try_create(&mut v, "j2", vec![member(7, 1)], vec![], exp).contains("must be active agents")
+    );
+    assert!(
+        try_create(&mut v, "j2", vec![member(1, 1), member(1, 2)], vec![], exp)
+            .contains("duplicate")
+    );
+    assert!(
+        try_create(&mut v, "j2", vec![member(1, 0)], vec![], exp).contains("cap must be positive")
+    );
+    assert!(try_create(&mut v, "j2", vec![], vec![], exp).contains("1-16 members"));
+    assert!(
+        try_create(&mut v, "j2", vec![member(1, 1)], vec![ATTACKER.into()], exp)
+            .contains("not on the vault allowlist")
+    );
+    assert!(
+        try_create(&mut v, "j2", vec![member(1, 1)], vec![], secs(T0)).contains("in the future")
+    );
+
+    as_agent(1, T0);
+    assert!(try_create(&mut v, "j3", vec![member(1, 1)], vec![], exp).contains("owner only"));
+}
+
+#[test]
+fn closing_refunds_the_rest_to_the_funder_only() {
+    let mut v = setup_job();
+    pay_job(&mut v, 1, 2_000_000, DEPOSIT_1);
+
+    // Strangers cannot close an open job.
+    as_account("stranger.near", T0 + MIN);
+    assert!(rejection(|| {
+        v.close_job(JOB.into());
+    })
+    .contains("only the owner or the funder"));
+
+    as_account(HIRER, T0 + MIN);
+    assert_eq!(v.close_job(JOB.into()), U128(3_000_000));
+    let j = job(&v);
+    assert_eq!(j.status, JobStatus::Closed);
+    assert_eq!(j.balance, U128(0));
+    assert_eq!(j.refunded, U128(3_000_000));
+    assert_eq!(balances(&v), (POOL, 0, 5_000_000));
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("job_closed") && l.contains(HIRER)));
+
+    assert_job_rejected(
+        &mut v,
+        2,
+        Q::new(1_000_000, DEPOSIT_2),
+        "job job-1 is closed",
+    );
+    as_account(HIRER, T0 + MIN);
+    assert!(rejection(|| {
+        v.close_job(JOB.into());
+    })
+    .contains("already closed"));
+}
+
+#[test]
+fn expired_job_pays_nothing_and_anyone_can_close_it() {
+    let mut v = setup_job();
+    let later = T0 + (DAY_SECS + 1) * NS_PER_SEC;
+    let mut q = Q::new(1_000_000, DEPOSIT_1);
+    q.issued = later;
+    q.deadline = later + 60 * MIN;
+    as_agent(1, later + MIN);
+    let msg = rejection(|| {
+        let _ = v.pay_quote(q.signed(), None, Some(JOB.into()));
+    });
+    assert!(msg.contains("has expired"), "{msg}");
+
+    as_account("stranger.near", later);
+    assert_eq!(v.close_job(JOB.into()), U128(JOB_BUDGET));
+}
+
+#[test]
+fn failed_payment_after_close_is_refundable() {
+    let mut v = setup_job();
+    pay_job(&mut v, 1, 2_000_000, DEPOSIT_1);
+    as_account(HIRER, T0 + MIN);
+    v.close_job(JOB.into());
+
+    // The in-flight job payment fails after the job closed: the money returns to the job...
+    callback_env(PromiseResult::Failed);
+    assert!(!v.on_transfer_complete(
+        agent_key(1),
+        DEPOSIT_1.into(),
+        U128(2_000_000),
+        T0 / NS_PER_DAY,
+        Some(JOB.into())
+    ));
+    assert_eq!(job(&v).balance, U128(2_000_000));
+    assert_eq!(job(&v).members[0].spent, U128(0));
+    assert_eq!(balances(&v), (POOL, 2_000_000, 3_000_000));
+
+    // ...and closing again sends it to the funder.
+    as_account(HIRER, T0 + MIN);
+    assert_eq!(v.close_job(JOB.into()), U128(2_000_000));
+}
+
+#[test]
+fn failed_refund_can_be_retried() {
+    let mut v = setup_job();
+    as_owner(T0);
+    v.close_job(JOB.into());
+    callback_env(PromiseResult::Failed);
+    assert!(!v.on_refund_complete(JOB.into(), U128(JOB_BUDGET)));
+    assert_eq!(job(&v).balance, U128(JOB_BUDGET));
+    assert_eq!(balances(&v), (POOL, JOB_BUDGET, 0));
+
+    as_owner(T0);
+    assert_eq!(v.close_job(JOB.into()), U128(JOB_BUDGET));
+    callback_env(PromiseResult::Successful(vec![]));
+    assert!(v.on_refund_complete(JOB.into(), U128(JOB_BUDGET)));
+    assert_eq!(balances(&v), (POOL, 0, 0));
+    assert_eq!(job(&v).refunded, U128(JOB_BUDGET));
+}
+
+#[test]
+fn sync_credits_untracked_tokens_to_the_pool() {
+    let mut v = setup_job();
+    // 1Click refunded 3 USDC with a plain ft_transfer: the vault holds 3 more than it tracks.
+    callback_env(PromiseResult::Successful(vec![]));
+    let surplus = v.on_balance(U128(0), Ok(U128(POOL + JOB_BUDGET + 3_000_000)));
+    assert_eq!(surplus, U128(3_000_000));
+    assert_eq!(balances(&v), (POOL + 3_000_000, JOB_BUDGET, 0));
+}
+
+#[test]
+fn sync_does_not_count_a_transfer_that_completed_after_the_read() {
+    let mut v = setup();
+    // The balance is read (100 USDC) before the payment starts...
+    let snapshot = U128(0);
+    let read = U128(POOL);
+    // ...then a 1 USDC payment starts and completes before the sync callback runs.
+    as_agent(1, T0 + MIN);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
+    callback_env(PromiseResult::Successful(vec![]));
+    v.on_transfer_complete(
+        agent_key(1),
+        DEPOSIT_1.into(),
+        U128(1_000_000),
+        T0 / NS_PER_DAY,
+        None,
+    );
+    callback_env(PromiseResult::Successful(vec![]));
+    assert_eq!(v.on_balance(snapshot, Ok(read)), U128(0));
+    assert_eq!(balances(&v), (POOL - 1_000_000, 0, 0));
+}
+
+#[test]
+fn sync_reports_a_shortfall_and_is_owner_only() {
+    let mut v = setup();
+    callback_env(PromiseResult::Successful(vec![]));
+    assert_eq!(v.on_balance(U128(0), Ok(U128(POOL - 1))), U128(0));
+    assert!(get_logs().iter().any(|l| l.contains("balance_shortfall")));
+
+    as_agent(1, T0);
+    assert!(rejection(|| {
+        let _ = v.sync_balance();
+    })
+    .contains("owner only"));
+}
+
+#[test]
+fn jobs_are_listed() {
+    let v = setup_job();
+    let jobs = v.get_jobs(None, None);
+    assert_eq!(jobs.len(), 1);
+    assert_eq!(jobs[0].0, JOB);
+    assert_eq!(jobs[0].1.funded, U128(JOB_BUDGET));
 }

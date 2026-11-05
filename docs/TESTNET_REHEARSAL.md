@@ -44,7 +44,7 @@ The script pauses before every step. In step 1 a browser window opens and **you*
 | 3 | Download the CI-built contract | Success |
 | 4 | Create the agent key and test signer (saved in `beeline-api/.testnet/`, which git ignores) | Prints two public keys |
 | 5 | Deploy and initialize the vault | Success |
-| 6 | Register the vault with test USDC and mint 20 test USDC | Success |
+| 6 | Register the vault with test USDC, mint 20 test USDC, then `sync_balance` credits it to the vault's pool | Success; `get_balances` shows `pool: 20000000` |
 | 7 | Register the agent (key limited to `pay_quote`) | Success |
 | 8 | Agent pays 1 USDC to the allowed recipient | ✅ Success |
 | 9 | Prompt-injected payment to an attacker | ❌ Rejected: "not on the allowlist" |

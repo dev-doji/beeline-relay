@@ -15,12 +15,15 @@
 //!   6. the deposit address has **never been paid** before,
 //!   7. at or above the owner's threshold, a **NEAR AI reviewer model approved this exact
 //!      quote** under the owner's policy prompt, proven by the model's TEE signing key
-//!      (see `review.rs`).
+//!      (see `review.rs`),
+//!   8. the vault holds enough **of the right funds**: the owner's pool for ordinary payments,
+//!      or, for a swarm job, that job's escrow within the agent's job cap (see `jobs.rs`).
 //!
 //! A prompt-injected agent, or a compromised Beeline server, cannot get past these checks: it
 //! cannot forge 1Click's signature or change the allowlist, and every rejection is a failed
 //! transaction anyone can see on the explorer.
 
+mod jobs;
 mod quote;
 mod review;
 
@@ -31,17 +34,18 @@ use near_sdk::{
     Promise, PromiseResult, PublicKey,
 };
 
+pub use jobs::{Balances, Job, JobMember, JobMemberInput, JobStatus};
 pub use quote::parse_rfc3339_utc;
 pub use review::Review;
 use review::Reviewer;
 
 const NS_PER_DAY: u64 = 86_400 * 1_000_000_000;
-const NS_PER_SEC: u64 = 1_000_000_000;
+pub(crate) const NS_PER_SEC: u64 = 1_000_000_000;
 /// NEP-145 registration for the deposit account on the token contract; any excess is refunded.
 const STORAGE_DEPOSIT: NearToken = NearToken::from_yoctonear(1_250_000_000_000_000_000_000);
 const GAS_STORAGE_DEPOSIT: Gas = Gas::from_tgas(10);
-const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
-const GAS_CALLBACK: Gas = Gas::from_tgas(10);
+pub(crate) const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
+pub(crate) const GAS_CALLBACK: Gas = Gas::from_tgas(10);
 /// Gas-fee allowance granted to each agent key (it pays for the agent's transactions only).
 const AGENT_KEY_ALLOWANCE: NearToken = NearToken::from_millinear(250);
 
@@ -52,6 +56,7 @@ enum StorageKey {
     DestinationAssets,
     Agents,
     UsedDeposits,
+    Jobs,
 }
 
 #[near(serializers = [borsh, json])]
@@ -94,6 +99,15 @@ pub struct AgentVault {
     agents: IterableMap<PublicKey, Agent>,
     used_deposits: LookupSet<String>,
     reviewer: Option<Reviewer>,
+    /// The owner's general funds (see `jobs.rs` for the accounting).
+    pool: u128,
+    /// Sum of all job balances.
+    escrowed: u128,
+    /// Sent and awaiting the transfer callback.
+    in_flight: u128,
+    /// Total of all outgoing transfers that completed; used by `sync_balance`.
+    completed_out: u128,
+    jobs: IterableMap<String, Job>,
 }
 
 /// The registered AI reviewer, as shown by `get_reviewer`.
@@ -106,12 +120,21 @@ pub struct ReviewerView {
     pub threshold: U128,
 }
 
-fn reject(reason: &str) -> ! {
+pub(crate) fn reject(reason: &str) -> ! {
     env::panic_str(&format!("BEELINE_VAULT_REJECTED: {reason}"))
 }
 
+/// True if the single promise this callback waited on succeeded. The result body is not read,
+/// so its size cannot exhaust gas.
+pub(crate) fn transfer_succeeded() -> bool {
+    #[allow(deprecated)]
+    let ok = env::promise_results_count() == 1
+        && matches!(env::promise_result(0), PromiseResult::Successful(_));
+    ok
+}
+
 /// Emits a NEP-297 event log.
-fn emit(event: &str, data: near_sdk::serde_json::Value) {
+pub(crate) fn emit(event: &str, data: near_sdk::serde_json::Value) {
     env::log_str(&format!(
         "EVENT_JSON:{}",
         near_sdk::serde_json::json!({
@@ -155,6 +178,11 @@ impl AgentVault {
             agents: IterableMap::new(StorageKey::Agents),
             used_deposits: LookupSet::new(StorageKey::UsedDeposits),
             reviewer: None,
+            pool: 0,
+            escrowed: 0,
+            in_flight: 0,
+            completed_out: 0,
+            jobs: IterableMap::new(StorageKey::Jobs),
         };
         for r in allowed_recipients {
             vault.recipients.insert(r);
@@ -169,8 +197,14 @@ impl AgentVault {
 
     /// Pays the deposit address of a 1Click-signed quote, if every policy check passes.
     /// Callable only with an active agent access key on this account. `review` is required
-    /// when a reviewer is registered and the amount is at or above its threshold.
-    pub fn pay_quote(&mut self, quote_json: String, review: Option<Review>) -> Promise {
+    /// when a reviewer is registered and the amount is at or above its threshold. With
+    /// `job_id`, the payment is drawn from that swarm job's escrow; otherwise from the pool.
+    pub fn pay_quote(
+        &mut self,
+        quote_json: String,
+        review: Option<Review>,
+        job_id: Option<String>,
+    ) -> Promise {
         if self.paused {
             reject("vault is paused");
         }
@@ -291,7 +325,26 @@ impl AgentVault {
             ));
         }
 
+        // Funds: a job's escrow, or the owner's pool. Never one for the other.
+        match &job_id {
+            Some(id) => {
+                self.check_job_payment(id, &agent_pk, &q.recipient, amount, now / NS_PER_SEC)
+            }
+            None if amount > self.pool => reject(&format!(
+                "the vault pool has {} available; escrowed job funds need a job_id",
+                self.pool
+            )),
+            None => {}
+        }
+
         // Effects before the cross-contract call; the callback reverts them if the transfer fails.
+        match &job_id {
+            Some(id) => self.debit_job(id, &agent_pk, amount),
+            None => {
+                self.pool -= amount;
+                self.in_flight += amount;
+            }
+        }
         agent.spent_today = U128(spent);
         agent.total_spent = U128(agent.total_spent.0 + amount);
         agent.payments += 1;
@@ -319,6 +372,7 @@ impl AgentVault {
                 "destination_asset": q.destination_asset,
                 "amount": amount.to_string(),
                 "quote_hash": q.hash,
+                "job_id": job_id,
             }),
         );
 
@@ -350,7 +404,7 @@ impl AgentVault {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_CALLBACK)
-                    .on_transfer_complete(agent_pk, q.deposit_address, U128(amount), today),
+                    .on_transfer_complete(agent_pk, q.deposit_address, U128(amount), today, job_id),
             )
     }
 
@@ -363,16 +417,23 @@ impl AgentVault {
         deposit_address: String,
         amount: U128,
         day: u64,
+        job_id: Option<String>,
     ) -> bool {
-        #[allow(deprecated)] // the result body is not read, so its size cannot exhaust gas
-        let ok = env::promise_results_count() == 1
-            && matches!(env::promise_result(0), PromiseResult::Successful(_));
-        if ok {
+        if transfer_succeeded() {
+            self.in_flight = self.in_flight.saturating_sub(amount.0);
+            self.completed_out += amount.0;
             emit(
                 "payment_sent",
-                near_sdk::serde_json::json!({ "deposit_address": deposit_address, "amount": amount }),
+                near_sdk::serde_json::json!({ "deposit_address": deposit_address, "amount": amount, "job_id": job_id }),
             );
             return true;
+        }
+        match &job_id {
+            Some(id) => self.restore_job(id, &agent_pk, amount.0),
+            None => {
+                self.in_flight = self.in_flight.saturating_sub(amount.0);
+                self.pool += amount.0;
+            }
         }
         if let Some(agent) = self.agents.get_mut(&agent_pk) {
             if agent.day == day {
@@ -384,14 +445,14 @@ impl AgentVault {
         self.used_deposits.remove(&deposit_address);
         emit(
             "payment_failed",
-            near_sdk::serde_json::json!({ "deposit_address": deposit_address, "amount": amount }),
+            near_sdk::serde_json::json!({ "deposit_address": deposit_address, "amount": amount, "job_id": job_id }),
         );
         false
     }
 
     // ----- Owner administration ----------------------------------------------------------
 
-    fn assert_owner(&self) {
+    pub(crate) fn assert_owner(&self) {
         require!(
             env::predecessor_account_id() == self.owner,
             "BEELINE_VAULT_REJECTED: owner only"
@@ -527,19 +588,6 @@ impl AgentVault {
         self.assert_owner();
         self.paused = paused;
         emit("paused", near_sdk::serde_json::json!({ "paused": paused }));
-    }
-
-    /// Returns vault tokens to an account of the owner's choosing.
-    pub fn withdraw(&mut self, amount: U128, receiver_id: AccountId) -> Promise {
-        self.assert_owner();
-        Promise::new(self.token.clone()).function_call(
-            "ft_transfer".to_string(),
-            near_sdk::serde_json::json!({ "receiver_id": receiver_id, "amount": amount })
-                .to_string()
-                .into_bytes(),
-            NearToken::from_yoctonear(1),
-            GAS_FT_TRANSFER,
-        )
     }
 
     // ----- Views -------------------------------------------------------------------------

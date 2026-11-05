@@ -14,15 +14,16 @@ The owner is non-technical. They make product decisions, and the agent makes the
 |---|---|---|
 | Go API: live 1Click quotes, idempotent payment sessions, state machine, events, API keys, workspace isolation | `beeline-api/` | Unit and integration tested (Neon Postgres). A live 1Click quote was verified. |
 | 1Click quote signature verification (Go and Rust) | `beeline-api/internal/intents/signature.go`, `contracts/agent-vault/src/quote.rs` | Verified against a **real** 1Click quote |
-| NEAR agent vault: function-call agent keys, allowlist, limits, single-use deposits, refund-to-vault | `contracts/agent-vault/` | 33 unit tests. **Not deployed yet.** |
+| NEAR agent vault: function-call agent keys, allowlist, limits, single-use deposits, refund-to-vault | `contracts/agent-vault/` | 51 unit tests (with escrow). **Not deployed yet.** |
 | AI-reviewer co-signature: above a threshold, a NEAR AI Cloud model must approve the exact quote, verified on-chain | `contracts/agent-vault/src/review.rs` | Unit-tested with NEAR AI's documented ed25519 `provider_tee` format. **Not yet checked against a live NEAR AI signature.** |
+| Swarm job escrow: a hirer funds a job with `ft_transfer_call`, member agents spend it under per-job caps and a job recipient list (narrows the allowlist), and `close_job` refunds only the funder. Pool/escrow/in-flight accounting; `withdraw` is pool-only; `sync_balance` credits untracked tokens. | `contracts/agent-vault/src/jobs.rs` | Unit-tested (18 tests). **Not deployed.** The rehearsal now calls `sync_balance` after minting. |
 | Testnet rehearsal (deploy, 1 allowed payment, 4 on-chain attacks) | `scripts/testnet-rehearsal.ps1`, `docs/TESTNET_REHEARSAL.md` | **Not run successfully yet** (see below) |
 
 ## In progress / next
 
 1. **Testnet rehearsal.** The owner's `goni.testnet` has 0 NEAR and the web-wallet import didn't add the CLI key. Next attempt: create a faucet-funded account with `near account create-account sponsor-by-faucet-service <name>.testnet autogenerate-new-keypair save-to-keychain network-config testnet create`, then run `.\scripts\testnet-rehearsal.ps1 -Owner <name>.testnet -SkipImport`. Debug from its output.
 2. **Live NEAR AI signature check.** Needs a NEAR AI Cloud API key in `beeline-api/.env` (gitignored). Build the Go client that calls `POST https://cloud-api.near.ai/v1/chat/completions` (non-streaming), keeps the exact request and response bytes, fetches `GET /v1/signature/{chat_id}?model=…&signing_algo=ed25519`, and checks it the way `review.rs` does. Also verify the attestation (`GET /v1/attestation/report`) off-chain. Docs: https://docs.near.ai/cloud/verification
-3. **Swarm job escrow** in the vault (one job budget, several agents with their own keys and limits). There is no marketplace or bidding UI.
+3. ~~Swarm job escrow~~ done (see table). Still to do: add a job scene to the testnet rehearsal (create job, fund it with `ft_transfer_call`, a member pays, a non-member is rejected, close and refund).
 4. **MCP server and reference swarm agents**, with prompt-injection demo scenes.
 5. Off-chain policy, reconcile and evidence. Console. Deploy. **Mainnet live run** (the owner signs and funds: about 5 NEAR plus 15 USDC; mainnet wallet `goni19.near`, also the prize wallet). README and video. Submit.
 
