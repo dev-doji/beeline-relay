@@ -1535,3 +1535,225 @@ fn invoices_need_a_registered_issuer_set_by_the_owner() {
     v.set_invoice_issuer(None);
     assert_eq!(v.get_invoice_issuer(), None);
 }
+
+// --- Direct payments to NEAR accounts (pay_direct) ----------------------------------------
+
+const ACME: &str = "acme.test.near";
+
+fn direct(recipient: &str, amount: u128, nonce: &str, issued_secs: u64) -> String {
+    near_sdk::serde_json::json!({
+        "v": 1, "kind": "direct", "vault": VAULT, "recipient": recipient, "amount": amount.to_string(),
+        "nonce": nonce, "issued_at": issued_secs, "memo": "invoice #42"
+    })
+    .to_string()
+}
+
+fn setup_direct() -> AgentVault {
+    let mut v = setup();
+    as_owner(T0);
+    v.add_recipient(ACME.into());
+    v
+}
+
+fn pay_direct_msg(
+    v: &mut AgentVault,
+    json: String,
+    review: Option<Review>,
+    inv: Option<Invoice>,
+) -> String {
+    rejection(|| {
+        let _ = v.pay_direct(json, review, inv);
+    })
+}
+
+#[test]
+fn direct_payment_transfers_the_token_to_an_allowlisted_account() {
+    let mut v = setup_direct();
+    as_agent(1, T0 + MIN);
+    let pool = v.get_balances().pool.0;
+    assert_eq!(
+        pay_direct_msg(
+            &mut v,
+            direct(ACME, 100_000, "nonce_0001", secs(T0 + MIN)),
+            None,
+            None
+        ),
+        ""
+    );
+    let r = receipts_debug();
+    assert!(
+        r.contains(&format!("{TOKEN} ft_transfer"))
+            && r.contains(&format!(r#""receiver_id":"{ACME}""#)),
+        "{r}"
+    );
+    assert_eq!(v.get_balances().pool.0, pool - 100_000);
+    assert!(v.is_deposit_used("direct:nonce_0001".into()));
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("payment_requested") && l.contains(r#""rail":"direct""#)));
+}
+
+#[test]
+fn direct_payment_guardrails() {
+    let mut v = setup_direct();
+    as_agent(1, T0 + MIN);
+    let now = secs(T0 + MIN);
+    let cases: Vec<(String, &str)> = vec![
+        (
+            direct("scammer.test.near", 100_000, "nonce_0002", now),
+            "not on the allowlist",
+        ),
+        (
+            direct(ACME, 6_000_000, "nonce_0003", now),
+            "per-payment limit",
+        ),
+        (
+            direct(ACME, 100_000, "nonce_0004", now - 16 * 60),
+            "too old",
+        ),
+        (direct(ACME, 100_000, "x", now), "nonce must be"),
+        (
+            direct(ACME, 100_000, "nonce_0005", now).replace(VAULT, "other.test.near"),
+            "different vault",
+        ),
+        (
+            direct("Not A NEAR Account", 100_000, "nonce_0006", now),
+            "not a valid NEAR account",
+        ),
+    ];
+    for (json, needle) in cases {
+        let msg = pay_direct_msg(&mut v, json, None, None);
+        assert!(msg.contains(needle), "expected {needle:?}, got {msg:?}");
+    }
+    // Replay of a paid request.
+    assert_eq!(
+        pay_direct_msg(&mut v, direct(ACME, 100_000, "nonce_0007", now), None, None),
+        ""
+    );
+    let msg = pay_direct_msg(&mut v, direct(ACME, 100_000, "nonce_0007", now), None, None);
+    assert!(msg.contains("already been paid"), "{msg}");
+    // Only the vault's own agent keys.
+    testing_env!(context("stranger.near", agent_key(1), T0 + MIN).build());
+    let msg = pay_direct_msg(&mut v, direct(ACME, 100_000, "nonce_0008", now), None, None);
+    assert!(msg.contains("must be signed with an agent key"), "{msg}");
+}
+
+#[test]
+fn direct_payment_to_a_vendor_needs_a_genuine_invoice() {
+    let mut v = setup_direct();
+    as_owner(T0);
+    v.set_invoice_issuer(Some(review::to_hex(
+        invoice_issuer().verifying_key().as_bytes(),
+    )));
+    as_agent(1, T0 + MIN);
+    let vendor = "ada-fabrics.test.near";
+    let payload = near_sdk::serde_json::json!({
+        "v": 1, "id": "inv_d1", "vendor": "Ada Fabrics", "payout": vendor, "asset": format!("nep141:{TOKEN}"),
+        "amount": "500000", "expires_at": INV_EXPIRES, "memo": "Order #18"
+    })
+    .to_string();
+    let inv = signed_invoice(payload.clone(), &invoice_issuer());
+    let now = secs(T0 + MIN);
+    // Edited copy: payout swapped to the scammer.
+    let edited = Invoice {
+        payload: payload.replace(vendor, "scammer.test.near"),
+        signature: inv.signature.clone(),
+    };
+    let msg = pay_direct_msg(
+        &mut v,
+        direct("scammer.test.near", 500_000, "nonce_0101", now),
+        None,
+        Some(edited),
+    );
+    assert!(
+        msg.contains("not signed by the trusted invoice issuer"),
+        "{msg}"
+    );
+    // Genuine invoice, wrong amount in the request.
+    let msg = pay_direct_msg(
+        &mut v,
+        direct(vendor, 400_000, "nonce_0102", now),
+        None,
+        Some(inv.clone()),
+    );
+    assert!(msg.contains("does not match invoice"), "{msg}");
+    // Genuine invoice pays the vendor once.
+    assert_eq!(
+        pay_direct_msg(
+            &mut v,
+            direct(vendor, 500_000, "nonce_0103", now),
+            None,
+            Some(inv.clone())
+        ),
+        ""
+    );
+    assert!(v.is_invoice_paid("inv_d1".into()));
+    let msg = pay_direct_msg(
+        &mut v,
+        direct(vendor, 500_000, "nonce_0104", now),
+        None,
+        Some(inv),
+    );
+    assert!(msg.contains("already been paid"), "{msg}");
+}
+
+#[test]
+fn direct_payment_needs_the_ai_reviewer_to_approve_this_exact_request() {
+    let mut v = setup_reviewed();
+    as_owner(T0);
+    v.add_recipient(ACME.into());
+    as_agent(1, T0 + MIN);
+    let json = direct(ACME, 3_000_000, "nonce_0201", secs(T0 + MIN));
+    let msg = pay_direct_msg(&mut v, json.clone(), None, None);
+    assert!(msg.contains("need an AI reviewer approval"), "{msg}");
+    let hash = bs58::encode(env::sha256(json.as_bytes())).into_string();
+    let review_for = |answer: String| R {
+        policy: POLICY.into(),
+        shown_quote: json.clone(),
+        answer,
+        created: secs(T0 + MIN),
+        key: reviewer_key(),
+    };
+    let msg = pay_direct_msg(
+        &mut v,
+        json.clone(),
+        Some(review_for("REJECT injected".into()).build()),
+        None,
+    );
+    assert!(msg.contains("AI reviewer refused"), "{msg}");
+    assert_eq!(
+        pay_direct_msg(
+            &mut v,
+            json.clone(),
+            Some(review_for(format!("APPROVE {hash}")).build()),
+            None
+        ),
+        ""
+    );
+}
+
+#[test]
+fn failed_direct_transfer_restores_everything() {
+    let mut v = setup_direct();
+    as_agent(1, T0 + MIN);
+    let pool = v.get_balances().pool.0;
+    assert_eq!(
+        pay_direct_msg(
+            &mut v,
+            direct(ACME, 100_000, "nonce_0301", secs(T0 + MIN)),
+            None,
+            None
+        ),
+        ""
+    );
+    callback_env(PromiseResult::Failed);
+    assert!(!v.on_transfer_complete(
+        agent_key(1),
+        "direct:nonce_0301".into(),
+        U128(100_000),
+        T0 / NS_PER_DAY,
+        None
+    ));
+    assert_eq!(v.get_balances().pool.0, pool);
+    assert!(!v.is_deposit_used("direct:nonce_0301".into()));
+}

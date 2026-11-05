@@ -23,6 +23,7 @@
 //! cannot forge 1Click's signature or change the allowlist, and every rejection is a failed
 //! transaction anyone can see on the explorer.
 
+mod direct;
 mod invoice;
 mod jobs;
 mod quote;
@@ -41,7 +42,7 @@ pub use quote::parse_rfc3339_utc;
 pub use review::Review;
 use review::Reviewer;
 
-const NS_PER_DAY: u64 = 86_400 * 1_000_000_000;
+pub(crate) const NS_PER_DAY: u64 = 86_400 * 1_000_000_000;
 pub(crate) const NS_PER_SEC: u64 = 1_000_000_000;
 /// NEP-145 registration for the deposit account on the token contract; any excess is refunded.
 const STORAGE_DEPOSIT: NearToken = NearToken::from_yoctonear(1_250_000_000_000_000_000_000);
