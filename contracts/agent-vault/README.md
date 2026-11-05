@@ -36,7 +36,7 @@ Allowlists can't catch a payment to an *allowed* recipient for the *wrong reason
 3. the reviewer was shown **the exact signed quote** being paid;
 4. the answer is fresh and its last line is `APPROVE <quote hash>`. A `REJECT ...` answer is reported in the failed transaction.
 
-**Limitation:** the vault doesn't verify NEAR AI's TEE attestation itself (Intel TDX and NVIDIA evidence). Before calling `set_reviewer`, the owner verifies the attestation report off-chain and checks that its ed25519 `signing_address` equals the key being registered. Instances of the same model share one signing key. The unit tests use a test key and NEAR AI's documented format, and `src/testdata/go_review.json` (a review built by the Go client in `beeline-api/internal/nearai`) must pass the same check. A live NEAR AI signature hasn't been checked yet.
+**Limitation:** the vault doesn't verify NEAR AI's TEE attestation itself (Intel TDX and NVIDIA evidence). Before calling `set_reviewer`, the owner verifies the attestation report off-chain and checks that its ed25519 `signing_address` equals the key being registered. Instances of the same model share one signing key. The unit tests use a test key and NEAR AI's documented format, and `src/testdata/go_review.json` (a review built by the Go client in `beeline-api/internal/nearai`) must pass the same check. **Live:** `src/testdata/live_review_approve.json` and `live_review_reject.json` are real NEAR AI reviews by `z-ai/glm-5.3-flash`, captured on 2026-11-05. The second one refuses a prompt-injected payment. Both are verified with the real model key `5a0210f2…caff` by the same code the vault runs. `go run ./cmd/review-check` (in `beeline-api`) also checks that this key is bound with a fresh nonce in the model's Intel TDX quote. It doesn't verify Intel's or NVIDIA's certificate chains.
 
 ## Swarm job escrow
 
@@ -72,7 +72,7 @@ Events use NEP-297 (`EVENT_JSON:`, standard `beeline-agent-vault`): `payment_req
 ## Build and test
 
 ```bash
-cargo test                                   # 52 unit tests
+cargo test                                   # 54 unit tests
 cargo near build non-reproducible-wasm       # optimized wasm for deployment
 ```
 

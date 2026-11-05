@@ -218,4 +218,100 @@ mod tests {
         .unwrap();
         assert!(err.contains("did not approve"), "{err}");
     }
+
+    fn load(raw: &str) -> (Value, Reviewer, Review) {
+        let f: Value = near_sdk::serde_json::from_str(raw).unwrap();
+        let s = |k: &str| f[k].as_str().unwrap().to_string();
+        let reviewer = Reviewer {
+            model: s("model"),
+            signing_key: from_hex::<32>(&s("signing_key")).unwrap(),
+            policy_prompt_sha256: from_hex::<32>(&s("policy_sha256")).unwrap(),
+            threshold: 1,
+        };
+        let review = Review {
+            request: f["review"]["request"].as_str().unwrap().into(),
+            response: f["review"]["response"].as_str().unwrap().into(),
+            signature: f["review"]["signature"].as_str().unwrap().into(),
+        };
+        (f, reviewer, review)
+    }
+
+    /// A REAL NEAR AI Cloud review (z-ai/glm-5.3-flash, provider_tee ed25519 signature),
+    /// captured live on 2026-11-05: the reviewer approved a payment that matches its task.
+    #[test]
+    fn accepts_live_near_ai_approval() {
+        testing_env!(VMContextBuilder::new().build());
+        let (f, reviewer, review) = load(include_str!("testdata/live_review_approve.json"));
+        let created = f["created"].as_u64().unwrap();
+        verify(
+            &review,
+            &reviewer,
+            f["quote_json"].as_str().unwrap(),
+            f["quote_hash"].as_str().unwrap(),
+            created + 60,
+            900,
+        )
+        .expect("a live NEAR AI approval must pass the vault's checks");
+
+        // Too late: the same approval is refused once it is older than the freshness window.
+        let err = verify(
+            &review,
+            &reviewer,
+            f["quote_json"].as_str().unwrap(),
+            f["quote_hash"].as_str().unwrap(),
+            created + 901,
+            900,
+        )
+        .err()
+        .unwrap();
+        assert!(err.contains("too old"), "{err}");
+    }
+
+    /// A REAL NEAR AI Cloud review captured live on 2026-11-05: a prompt-injected "urgent 5 USDC
+    /// prepayment". The signature is genuine, and the vault refuses because the model said REJECT.
+    #[test]
+    fn live_near_ai_refusal_blocks_the_injected_payment() {
+        testing_env!(VMContextBuilder::new().build());
+        let (f, reviewer, review) = load(include_str!("testdata/live_review_reject.json"));
+        let created = f["created"].as_u64().unwrap();
+        let err = verify(
+            &review,
+            &reviewer,
+            f["quote_json"].as_str().unwrap(),
+            f["quote_hash"].as_str().unwrap(),
+            created + 60,
+            900,
+        )
+        .err()
+        .unwrap();
+        assert!(err.contains("AI reviewer refused"), "{err}");
+
+        // Flipping the signed REJECT into an APPROVE breaks NEAR AI's signature.
+        let mut forged = review.clone();
+        let hash = f["quote_hash"].as_str().unwrap();
+        let reject_line = forged
+            .response
+            .split("\\n")
+            .last()
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap()
+            .to_string();
+        forged.response = forged
+            .response
+            .replace(&reject_line, &format!("APPROVE {hash}"));
+        assert_ne!(forged.response, review.response);
+        let err = verify(
+            &forged,
+            &reviewer,
+            f["quote_json"].as_str().unwrap(),
+            hash,
+            created + 60,
+            900,
+        )
+        .err()
+        .unwrap();
+        assert!(err.contains("not signed by the registered"), "{err}");
+    }
 }

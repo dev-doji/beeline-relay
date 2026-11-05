@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -301,4 +302,87 @@ func VerifySignature(r *Review, trustedKeyHex string) error {
 		return errors.New("signature does not verify")
 	}
 	return nil
+}
+
+// AttestationBinding is what CheckAttestation verified. It covers the key-to-TEE binding only:
+// Intel's DCAP signature chain over the TDX quote and NVIDIA's NRAS verdict on the GPU
+// evidence are NOT verified here (use NEAR AI's verifier or dcap-qvl for those).
+type AttestationBinding struct {
+	Model          string
+	SigningAddress string
+	Nonce          string
+	TDXQuoteBytes  int
+	GPUEvidence    int
+}
+
+// CheckAttestation fetches the model's attestation report with a fresh nonce and checks that
+// the TDX quote's report_data is signing_address || nonce, that the reported ed25519 key equals
+// expectedKeyHex (if given), and that the NVIDIA evidence echoes the same nonce.
+func (c *Client) CheckAttestation(ctx context.Context, model, expectedKeyHex string) (*AttestationBinding, error) {
+	var nonceBytes [32]byte
+	if _, err := rand.Read(nonceBytes[:]); err != nil {
+		return nil, err
+	}
+	nonce := hex.EncodeToString(nonceBytes[:])
+	q := url.Values{"model": {model}, "signing_algo": {"ed25519"}, "nonce": {nonce}}
+	raw, err := c.send(ctx, http.MethodGet, "/v1/attestation/report?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return checkAttestationReport(raw, model, expectedKeyHex, nonce)
+}
+
+func checkAttestationReport(raw []byte, model, expectedKeyHex, nonce string) (*AttestationBinding, error) {
+	var report struct {
+		ModelAttestations []struct {
+			ModelName      string `json:"model_name"`
+			SigningAddress string `json:"signing_address"`
+			SigningAlgo    string `json:"signing_algo"`
+			RequestNonce   string `json:"request_nonce"`
+			IntelQuote     string `json:"intel_quote"`
+			NvidiaPayload  string `json:"nvidia_payload"`
+		} `json:"model_attestations"`
+	}
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return nil, errors.New("attestation report is not valid JSON")
+	}
+	for _, m := range report.ModelAttestations {
+		if m.ModelName != model {
+			continue
+		}
+		if m.SigningAlgo != "ed25519" {
+			return nil, fmt.Errorf("attested key algorithm is %q, want ed25519", m.SigningAlgo)
+		}
+		if expectedKeyHex != "" && !strings.EqualFold(m.SigningAddress, strings.TrimPrefix(expectedKeyHex, "0x")) {
+			return nil, errors.New("attested signing key differs from the reviewer key")
+		}
+		if m.RequestNonce != nonce {
+			return nil, errors.New("attestation does not echo our nonce (stale or replayed report)")
+		}
+		quote, err := hex.DecodeString(m.IntelQuote)
+		// TDX quote v4: 48-byte header, then the TD report body whose last 64 bytes (offset
+		// 520) are report_data.
+		const reportDataOffset = 48 + 520
+		if err != nil || len(quote) < reportDataOffset+64 {
+			return nil, errors.New("intel quote is missing or too short")
+		}
+		if want := m.SigningAddress + nonce; !strings.EqualFold(hex.EncodeToString(quote[reportDataOffset:reportDataOffset+64]), want) {
+			return nil, errors.New("TDX report_data does not bind the signing key and our nonce")
+		}
+		var gpu struct {
+			Nonce        string            `json:"nonce"`
+			EvidenceList []json.RawMessage `json:"evidence_list"`
+		}
+		if err := json.Unmarshal([]byte(m.NvidiaPayload), &gpu); err != nil || gpu.Nonce != nonce {
+			return nil, errors.New("NVIDIA evidence does not echo our nonce")
+		}
+		return &AttestationBinding{
+			Model:          model,
+			SigningAddress: m.SigningAddress,
+			Nonce:          nonce,
+			TDXQuoteBytes:  len(quote),
+			GPUEvidence:    len(gpu.EvidenceList),
+		}, nil
+	}
+	return nil, fmt.Errorf("no attestation for model %s", model)
 }

@@ -265,3 +265,40 @@ func TestVaultFixtureIsCurrent(t *testing.T) {
 		t.Fatal("vault fixture is stale; run with UPDATE_FIXTURES=1 and re-run the contract tests")
 	}
 }
+
+func fakeReport(model, key, nonce, quoteNonce, gpuNonce string) []byte {
+	quote := make([]byte, 48+584)
+	rd, _ := hex.DecodeString(key + quoteNonce)
+	copy(quote[48+520:], rd)
+	gpu, _ := json.Marshal(map[string]any{"nonce": gpuNonce, "evidence_list": []any{map[string]string{}}})
+	raw, _ := json.Marshal(map[string]any{"model_attestations": []any{map[string]any{
+		"model_name": model, "signing_address": key, "signing_algo": "ed25519", "request_nonce": nonce,
+		"intel_quote": hex.EncodeToString(quote), "nvidia_payload": string(gpu),
+	}}})
+	return raw
+}
+
+func TestAttestationBinding(t *testing.T) {
+	key := strings.Repeat("ab", 32)
+	nonce := strings.Repeat("01", 32)
+	other := strings.Repeat("02", 32)
+	if _, err := checkAttestationReport(fakeReport("m", key, nonce, nonce, nonce), "m", key, nonce); err != nil {
+		t.Fatalf("valid binding rejected: %v", err)
+	}
+	cases := map[string][]byte{
+		"different key":         fakeReport("m", key, nonce, nonce, nonce),
+		"stale report nonce":    fakeReport("m", key, other, nonce, nonce),
+		"quote binds old nonce": fakeReport("m", key, nonce, other, nonce),
+		"gpu old nonce":         fakeReport("m", key, nonce, nonce, other),
+		"other model":           fakeReport("x", key, nonce, nonce, nonce),
+	}
+	for name, raw := range cases {
+		expected := key
+		if name == "different key" {
+			expected = strings.Repeat("cd", 32)
+		}
+		if _, err := checkAttestationReport(raw, "m", expected, nonce); err == nil {
+			t.Errorf("%s: expected rejection", name)
+		}
+	}
+}

@@ -10,4 +10,4 @@ keywords = ["sk-"]
 
 [allowlist]
 description = "Test fixtures that contain only public test keys and signatures"
-paths = ['''contracts/agent-vault/src/testdata/go_review\.json''']
+paths = ['''contracts/agent-vault/src/testdata/.*\.json''']

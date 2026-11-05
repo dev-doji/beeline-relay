@@ -34,7 +34,7 @@ Every refusal is a failed NEAR transaction with a `BEELINE_VAULT_REJECTED: <reas
 |---|---|
 | Vault: agent keys limited to `pay_quote`, allowlist, per-payment and daily limits, single-use quotes, refunds-to-vault, pause, revoke | ✅ Implemented and unit-tested. ❌ Not deployed yet. Not audited. |
 | 1Click quote signature verification (on-chain in Rust, and in Go) | ✅ Verified against a **real** 1Click quote and 1Click's real public key |
-| AI-reviewer co-signature (NEAR AI Cloud, verified on-chain) | ✅ Implemented and unit-tested with NEAR AI's documented signature format. A shared fixture proves the Rust vault accepts reviews built by the Go client byte for byte. ❌ Not yet run against a **live** NEAR AI signature (the account needs credits). TEE attestation is checked off-chain. |
+| AI-reviewer co-signature (NEAR AI Cloud, verified on-chain) | ✅ **Live-verified on 2026-11-05.** Two real NEAR AI reviews by `z-ai/glm-5.3-flash` (TEE-hosted, `provider_tee` ed25519 signature) are saved in `contracts/agent-vault/src/testdata/`. The vault's own check accepts the genuine approval, refuses the genuine rejection of a prompt-injected "urgent 5 USDC prepayment", and rejects that refusal once it's edited to say APPROVE. The reviewer key was found bound, with a fresh nonce, in the model's Intel TDX quote, and NVIDIA's evidence echoes the nonce. ❌ Intel DCAP and NVIDIA NRAS certificate chains are not verified by our tools yet. The vault doesn't check attestation on-chain (the owner does, before registering the key). |
 | Swarm job escrow (fund, member caps, close and refund to the funder only) | ✅ Implemented and unit-tested. ❌ Not deployed yet. |
 | API: live 1Click quotes, idempotent payment sessions, state machine, events, API keys, workspace isolation | ✅ Implemented. Unit-tested, and integration-tested on PostgreSQL. A live 1Click quote was fetched on 2026-11-04 (no funds moved). |
 | Testnet rehearsal: deploy, an allowed payment, four attacks rejected on-chain | ⏳ Script ready (`scripts/testnet-rehearsal.ps1`), not run yet |
@@ -52,7 +52,7 @@ Requirements: Go 1.27+ and Rust (stable).
 ```bash
 git clone https://github.com/dev-doji/beeline-relay && cd beeline-relay
 
-# Vault contract: policy, attack, escrow and AI-reviewer tests (52 tests)
+# Vault contract: policy, attack, escrow and AI-reviewer tests, including 2 real NEAR AI signatures (54 tests)
 cd contracts/agent-vault && cargo test && cd ../..
 
 # API and NEAR AI client tests. Database integration tests skip unless TEST_DATABASE_URL is set.
@@ -61,7 +61,7 @@ cd beeline-api && go test ./... && cd ..
 
 On Windows, set `AWS_LC_SYS_PREBUILT_NASM=1` before `cargo test`.
 
-Tests worth reading: `contracts/agent-vault/src/tests.rs` (the attacks the vault blocks: `rejects_recipient_not_on_allowlist`, `rejects_forged_quote`, `reviewer_refusal_blocks_payment`, `answer_edited_after_signing_is_rejected`, and the escrow cases), `contracts/agent-vault/src/quote.rs` (`live_quote_signature_verifies`), and `beeline-api/internal/integration` (8 concurrent retries create exactly one payment).
+Tests worth reading: `contracts/agent-vault/src/tests.rs` (the attacks the vault blocks: `rejects_recipient_not_on_allowlist`, `rejects_forged_quote`, `reviewer_refusal_blocks_payment`, `answer_edited_after_signing_is_rejected`, and the escrow cases), `contracts/agent-vault/src/quote.rs` (`live_quote_signature_verifies`), `contracts/agent-vault/src/review.rs` (`live_near_ai_refusal_blocks_the_injected_payment`), and `beeline-api/internal/integration` (8 concurrent retries create exactly one payment).
 
 ## Repository layout
 
@@ -71,7 +71,7 @@ contracts/agent-vault/   NEAR vault contract (Rust, near-sdk): lib.rs, quote.rs 
 beeline-api/             Go API (chi, PostgreSQL, slog)
   cmd/api                the HTTP server
   cmd/seed               creates a workspace and API keys
-  cmd/review-check       live NEAR AI review plus signature check (needs NEAR_AI_API_KEY)
+  cmd/review-check       live NEAR AI review: signature check and attestation binding (needs NEAR_AI_API_KEY)
   cmd/vault-testnet      testnet keys and TEST-signed quotes (1Click has no testnet)
   internal/intents       1Click client and quote-signature verification
   internal/nearai        NEAR AI Cloud reviewer client and signature verification
