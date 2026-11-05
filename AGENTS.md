@@ -9,7 +9,8 @@
 4. Verify current official NEAR Intents documentation before implementing provider-specific methods, payloads, authentication, route IDs, execution steps, or status mapping.
 5. Implement small, verifiable slices. After each slice, run relevant tests, formatting, linting, type checks, and build checks available in the repo.
 6. Keep `API_SPEC.md`, OpenAPI, implementation, tests, Bruno requests, and UI types synchronized.
-7. Report what is implemented, tested, simulated, live-verified, incomplete, and blocked by external credentials/manual actions.
+7. Keep `README.md` exactly true after every change: status table, commands and test names. Judging is agentic (Claude Code, Codex and Loops House Agentic Judging check that the project runs and matches its README), so an unbacked or stale claim costs points.
+8. Report what is implemented, tested, simulated, live-verified, incomplete, and blocked by external credentials/manual actions.
 
 ## Product boundaries
 
