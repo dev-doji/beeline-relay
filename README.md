@@ -40,15 +40,15 @@ Every refusal is a failed NEAR transaction with a `BEELINE_VAULT_REJECTED: <reas
 | Testnet rehearsal: deploy, an allowed payment, four attacks rejected on-chain | ✅ **Ran on NEAR testnet on 2026-11-05** (`vault.goni-beeline.testnet`). The allowed payment succeeded. The attacker recipient, forged quote, over-limit amount and replay were each rejected on-chain with a `BEELINE_VAULT_REJECTED` reason. Transaction links are in [docs/TESTNET_REHEARSAL.md](docs/TESTNET_REHEARSAL.md#results-first-full-run-2026-11-05). Quotes were TEST-signed because 1Click has no testnet. |
 | Two payment rails in the vault: `ORIGIN_CHAIN` (token sent to the 1Click deposit account) and `INTENTS` (`ft_transfer_call` into the NEAR Intents verifier on behalf of the deposit address; refunds land in the vault's Intents balance and `withdraw_from_intents` pulls them back) | ✅ Implemented and unit-tested. A **real** 1Click `INTENTS` quote fetched on 2026-11-05 verifies in Go and on-chain code. Since 2026-11-05, 1Click quotes NEAR-origin payments only on the `INTENTS` rail ([docs/NEAR_INTENTS_ROUTE.md](docs/NEAR_INTENTS_ROUTE.md) section 6b), and the API now requests that rail for USDC NEAR → Base. |
 | Live mainnet payment (USDC NEAR → USDC Base) | ❌ Not done yet. One small payment will confirm that 1Click picks up an on-behalf-of verifier deposit. |
+| **Playground** (`beeline-web` + `GET/POST /api/v1/playground`): type a task, including your own prompt injection, and watch the testnet vault decide | ✅ Built and run locally against `vault.goni-beeline.testnet`. Honest payment paid ([53pzT4aH…](https://testnet.nearblocks.io/txns/53pzT4aHSgxcqLyeNWPtPG22FeHEqHJLFf5Xunr2YmKg)), replay blocked ([8EULta4x…](https://testnet.nearblocks.io/txns/8EULta4xfjLiHD3GEq526J4bR2R76gFNz8xcVr6KHyDh)), attacker address blocked. ❌ Not deployed publicly yet. The AI reviewer step goes live on the vault once `scripts/playground-setup.ps1` registers it. |
 | Reconciliation, evidence export | ⏳ Planned |
 | MCP server and demo swarm agents | ⏳ Planned |
-| Console | ⏳ Planned |
 
 Nothing is marked live until it has really run. Test keys and simulated quotes are labelled as such everywhere: in code, fixtures and output.
 
 ## Check it yourself (about 2 minutes, no accounts or secrets needed)
 
-Requirements: Go 1.27+ and Rust (stable).
+Requirements: Go 1.27+, Rust (stable), and Node 22+ with pnpm 9 for the website.
 
 ```bash
 git clone https://github.com/dev-doji/beeline-relay && cd beeline-relay
@@ -58,6 +58,9 @@ cd contracts/agent-vault && cargo test && cd ../..
 
 # API and NEAR AI client tests. Database integration tests skip unless TEST_DATABASE_URL is set.
 cd beeline-api && go test ./... && cd ..
+
+# Website and Playground: type check and production build
+cd beeline-web && pnpm install && pnpm typecheck && pnpm build && cd ..
 ```
 
 On Windows, set `AWS_LC_SYS_PREBUILT_NASM=1` before `cargo test`.
@@ -69,6 +72,7 @@ Tests worth reading: `contracts/agent-vault/src/tests.rs` (the attacks the vault
 ```text
 contracts/agent-vault/   NEAR vault contract (Rust, near-sdk): lib.rs, quote.rs (1Click signature),
                          review.rs (NEAR AI reviewer), jobs.rs (swarm escrow), tests.rs
+beeline-web/             Website and Playground (Next.js, TypeScript)
 beeline-api/             Go API (chi, PostgreSQL, slog)
   cmd/api                the HTTP server
   cmd/seed               creates a workspace and API keys
@@ -77,7 +81,9 @@ beeline-api/             Go API (chi, PostgreSQL, slog)
   internal/intents       1Click client and quote-signature verification
   internal/nearai        NEAR AI Cloud reviewer client and signature verification
   internal/payment       idempotent payments, state machine, events
-scripts/                 testnet-rehearsal.ps1
+  internal/near          minimal NEAR RPC client that signs FunctionCall transactions (borsh, ed25519)
+  internal/playground    public testnet demo: TEST-signed quote, real NEAR AI review, real pay_quote transaction
+scripts/                 testnet-rehearsal.ps1, playground-setup.ps1
 docs/                    plan, provider research, testnet guide, handoff notes
 AGENTS.md                rules for coding agents working in this repo
 ```
@@ -104,6 +110,17 @@ go run ./cmd/seed -name "Dev workspace"   # prints API keys once; only hashes ar
 | POST | `/api/v1/payments` | Bearer + `Idempotency-Key` | Create a payment from a quote: replay-safe and conflict-checked |
 | GET | `/api/v1/payments`, `/api/v1/payments/{id}` | Bearer | Workspace-scoped payments |
 | GET | `/api/v1/payments/{id}/events` | Bearer | Append-only event timeline |
+
+## Run the Playground locally
+
+The Playground needs the testnet vault from the rehearsal below. Add to `beeline-api/.env`: `PLAYGROUND_VAULT=vault.<you>.testnet` and `PLAYGROUND_KEYS_DIR=.testnet`, plus `NEAR_AI_API_KEY` for live AI reviews. Then:
+
+```bash
+cd beeline-api && go run ./cmd/api              # API on :8080
+cd beeline-web && pnpm install && pnpm dev       # site on :3000 (set NEXT_PUBLIC_API_URL if the API isn't on localhost:8080)
+```
+
+Open `/playground`, pick a scenario or write your own task, and press **Run the agent**. Each step is labelled **Real** or **Simulated**: quotes are TEST-signed (1Click has no testnet), while the NEAR AI review and the vault transaction are real.
 
 ## Try the vault on testnet
 

@@ -23,6 +23,7 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mr-tron/base58"
@@ -52,6 +53,9 @@ func (k Key) PublicKey() string {
 type Client struct {
 	RPCURL string
 	HTTP   *http.Client
+
+	mu        sync.Mutex
+	lastNonce map[string]uint64 // per public key: the RPC's view can lag right after a send
 }
 
 func NewClient(rpcURL string, timeout time.Duration) *Client {
@@ -143,7 +147,7 @@ func (c *Client) Send(ctx context.Context, key Key, fc FunctionCall) (*Outcome, 
 		BlockHash string `json:"block_hash"`
 	}
 	if err := c.call(ctx, "query", map[string]any{
-		"request_type": "view_access_key", "finality": "final",
+		"request_type": "view_access_key", "finality": "optimistic",
 		"account_id": key.AccountID, "public_key": key.PublicKey(),
 	}, &ak); err != nil {
 		return nil, err
@@ -152,7 +156,8 @@ func (c *Client) Send(ctx context.Context, key Key, fc FunctionCall) (*Outcome, 
 	if err != nil || len(blockHash) != 32 {
 		return nil, errors.New("near: bad block hash from RPC")
 	}
-	signed, hash, err := SignFunctionCall(key, ak.Nonce+1, blockHash, fc)
+	nonce := c.nextNonce(key.PublicKey(), ak.Nonce)
+	signed, hash, err := SignFunctionCall(key, nonce, blockHash, fc)
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +171,21 @@ func (c *Client) Send(ctx context.Context, key Key, fc FunctionCall) (*Outcome, 
 	out := &Outcome{Hash: base58.Encode(hash)}
 	res.fill(out)
 	return out, nil
+}
+
+// nextNonce returns a nonce above both the chain's view and the last one this client used.
+func (c *Client) nextNonce(pk string, chainNonce uint64) uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.lastNonce == nil {
+		c.lastNonce = map[string]uint64{}
+	}
+	n := chainNonce + 1
+	if last := c.lastNonce[pk]; last >= n {
+		n = last + 1
+	}
+	c.lastNonce[pk] = n
+	return n
 }
 
 type txResult struct {

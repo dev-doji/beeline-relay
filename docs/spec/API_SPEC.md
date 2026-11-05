@@ -210,6 +210,25 @@ Returns recent payment sessions for the authenticated workspace, with pagination
 
 Add a provider callback/webhook endpoint only if the current official provider flow supports it and signature/authenticity can be verified. Do not assume that a webhook exists. Repeated events must be idempotent. If polling is the documented/reliable method for the selected integration, use reconciliation polling instead.
 
+## Public playground (testnet demo)
+
+Enabled only when `PLAYGROUND_VAULT` names a `.testnet` vault (`internal/playground`). There's no authentication. Requests are rate limited per client (`PLAYGROUND_RUNS_PER_MINUTE`, default 4) and per UTC day (`PLAYGROUND_RUNS_PER_DAY`, default 300). When disabled, both endpoints return `503 PROVIDER_UNAVAILABLE`.
+
+### `GET /playground`
+
+Returns the vault's live state, read from NEAR testnet views (`get_config`, `get_recipients`, `get_reviewer`, `get_balances`, `get_agents`). It also returns the agent's public key, the preset tasks per scenario, and the real/simulated disclosures.
+
+### `POST /playground/runs`
+
+```json
+{ "scenario": "honest | injected | attacker | forged | over_limit | replay | custom",
+  "task": "text the agent and the AI reviewer see (1-2000 chars)",
+  "recipient": "0x… (ignored for over_limit and replay)",
+  "amount": "base units, 6 decimals (ignored for over_limit and replay)" }
+```
+
+It runs one agent attempt and returns `{scenario, outcome: paid|blocked|error, reason, layer, tx_hash, explorer_url, steps[], started_at, duration_ms}`. Steps are `quote` (label `simulated`: a TESTNET-SIMULATED quote, signed by the vault's test signer or, for `forged`, a throwaway key), `review` (label `real`: a NEAR AI Cloud review when the vault's reviewer threshold applies, with the signature verified against the vault's registered key), and `vault` (label `real`: the `pay_quote` testnet transaction). `layer` names the guardrail behind a block: `allowlist`, `quote_signature`, `spend_limit`, `single_use`, `ai_reviewer` or `vault_policy`. Validation errors return `400 VALIDATION_ERROR`, and the rate limit returns `429 RATE_LIMITED`.
+
 ## Error envelope
 
 ```json

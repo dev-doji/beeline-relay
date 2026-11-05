@@ -126,3 +126,18 @@ func TestLiveTestnetReplayIsRejected(t *testing.T) {
 		t.Fatal("replay must be rejected by the vault")
 	}
 }
+
+func TestNextNonceNeverRepeats(t *testing.T) {
+	c := NewClient("http://unused", time.Second)
+	if n := c.nextNonce("k", 10); n != 11 {
+		t.Fatalf("got %d", n)
+	}
+	// The RPC still reports 10 (the last send is not visible yet): use 12, not 11 again.
+	if n := c.nextNonce("k", 10); n != 12 {
+		t.Fatalf("got %d", n)
+	}
+	// The chain moved ahead (another client used the key): follow it.
+	if n := c.nextNonce("k", 20); n != 21 {
+		t.Fatalf("got %d", n)
+	}
+}

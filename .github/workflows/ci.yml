@@ -69,6 +69,28 @@ jobs:
             contracts/agent-vault/target/near/agent_vault_abi.json
           if-no-files-found: error
 
+  web:
+    name: Website and playground
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: beeline-web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: beeline-web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: typecheck
+        run: pnpm typecheck
+      - name: build
+        run: pnpm build
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
