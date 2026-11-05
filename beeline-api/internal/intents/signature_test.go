@@ -1,6 +1,8 @@
 package intents
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 )
@@ -47,5 +49,23 @@ func TestUnsignedFieldsDoNotAffectHash(t *testing.T) {
 	ok, err := VerifyQuoteSignature([]byte(changed), liveSignature, OneClickManagerPublicKey)
 	if err != nil || !ok {
 		t.Fatalf("unsigned fields changed the result: ok=%v err=%v", ok, err)
+	}
+}
+
+// A real INTENTS-deposit quote fetched on 2026-11-05 (shared with the vault's Rust tests).
+func TestLiveIntentsQuoteSignatureVerifies(t *testing.T) {
+	raw, err := os.ReadFile("../../../contracts/agent-vault/src/testdata/live_intents_quote.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var q struct {
+		Signature string `json:"signature"`
+	}
+	if err := json.Unmarshal(raw, &q); err != nil {
+		t.Fatal(err)
+	}
+	ok, err := VerifyQuoteSignature(raw, q.Signature, OneClickManagerPublicKey)
+	if err != nil || !ok {
+		t.Fatalf("live INTENTS quote must verify: ok=%v err=%v", ok, err)
 	}
 }

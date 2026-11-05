@@ -46,6 +46,11 @@ const STORAGE_DEPOSIT: NearToken = NearToken::from_yoctonear(1_250_000_000_000_0
 const GAS_STORAGE_DEPOSIT: Gas = Gas::from_tgas(10);
 pub(crate) const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 pub(crate) const GAS_CALLBACK: Gas = Gas::from_tgas(10);
+/// ft_transfer_call into the NEAR Intents verifier (covers its ft_on_transfer and the resolve).
+const GAS_FT_TRANSFER_CALL: Gas = Gas::from_tgas(60);
+const GAS_INTENTS_WITHDRAW: Gas = Gas::from_tgas(60);
+/// The NEAR Intents verifier contract on mainnet.
+const DEFAULT_INTENTS_CONTRACT: &str = "intents.near";
 /// Gas-fee allowance granted to each agent key (it pays for the agent's transactions only).
 const AGENT_KEY_ALLOWANCE: NearToken = NearToken::from_millinear(250);
 
@@ -81,6 +86,7 @@ pub struct Config {
     pub max_quote_age_secs: u64,
     pub min_deadline_margin_secs: u64,
     pub paused: bool,
+    pub intents_contract: AccountId,
 }
 
 #[near(contract_state)]
@@ -108,6 +114,8 @@ pub struct AgentVault {
     /// Total of all outgoing transfers that completed; used by `sync_balance`.
     completed_out: u128,
     jobs: IterableMap<String, Job>,
+    /// NEAR Intents verifier used for `INTENTS`-deposit quotes.
+    intents_contract: AccountId,
 }
 
 /// The registered AI reviewer, as shown by `get_reviewer`.
@@ -131,6 +139,22 @@ pub(crate) fn transfer_succeeded() -> bool {
     let ok = env::promise_results_count() == 1
         && matches!(env::promise_result(0), PromiseResult::Successful(_));
     ok
+}
+
+/// The amount an `ft_transfer_call` reports as used (0 if it failed or returned nothing usable).
+/// The result comes from this vault's own token contract.
+fn intents_deposit_used() -> u128 {
+    #[allow(deprecated)]
+    if env::promise_results_count() != 1 {
+        return 0;
+    }
+    #[allow(deprecated)]
+    match env::promise_result(0) {
+        PromiseResult::Successful(bytes) => near_sdk::serde_json::from_slice::<U128>(&bytes)
+            .map(|v| v.0)
+            .unwrap_or(0),
+        _ => 0,
+    }
 }
 
 /// Emits a NEP-297 event log.
@@ -183,6 +207,7 @@ impl AgentVault {
             in_flight: 0,
             completed_out: 0,
             jobs: IterableMap::new(StorageKey::Jobs),
+            intents_contract: DEFAULT_INTENTS_CONTRACT.parse().unwrap(),
         };
         for r in allowed_recipients {
             vault.recipients.insert(r);
@@ -227,13 +252,21 @@ impl AgentVault {
         if q.dry {
             reject("dry-run quotes cannot be paid");
         }
-        if q.swap_type != "EXACT_INPUT" || q.deposit_type != "ORIGIN_CHAIN" {
-            reject("only EXACT_INPUT quotes with ORIGIN_CHAIN deposits are supported");
+        // Two ways to fund a quote: ORIGIN_CHAIN (send the token to the deposit account) or
+        // INTENTS (deposit into the NEAR Intents verifier on behalf of the deposit address).
+        // Refunds use the same rail and must return to this vault either way.
+        let via_intents = match q.deposit_type.as_str() {
+            "ORIGIN_CHAIN" => false,
+            "INTENTS" => true,
+            _ => reject("only ORIGIN_CHAIN or INTENTS deposits are supported"),
+        };
+        if q.swap_type != "EXACT_INPUT" {
+            reject("only EXACT_INPUT quotes are supported");
         }
         if q.origin_asset != format!("nep141:{}", self.token) {
             reject("quote does not spend this vault's token");
         }
-        if q.refund_to != env::current_account_id().as_str() || q.refund_type != "ORIGIN_CHAIN" {
+        if q.refund_to != env::current_account_id().as_str() || q.refund_type != q.deposit_type {
             reject("refunds must return to this vault");
         }
         if !self.destination_assets.contains(&q.destination_asset) {
@@ -380,6 +413,35 @@ impl AgentVault {
             .deposit_address
             .parse()
             .unwrap_or_else(|_| reject("deposit address is not a NEAR account"));
+        if via_intents {
+            // Deposit into the verifier, owned by the deposit address (verifier ft_on_transfer:
+            // `msg` is the AccountId of the internal recipient).
+            return Promise::new(self.token.clone())
+                .function_call(
+                    "ft_transfer_call".to_string(),
+                    near_sdk::serde_json::json!({
+                        "receiver_id": self.intents_contract,
+                        "amount": amount.to_string(),
+                        "memo": format!("beeline:{}", q.hash),
+                        "msg": deposit,
+                    })
+                    .to_string()
+                    .into_bytes(),
+                    NearToken::from_yoctonear(1),
+                    GAS_FT_TRANSFER_CALL,
+                )
+                .then(
+                    Self::ext(env::current_account_id())
+                        .with_static_gas(GAS_CALLBACK)
+                        .on_intents_deposit_complete(
+                            agent_pk,
+                            q.deposit_address,
+                            U128(amount),
+                            today,
+                            job_id,
+                        ),
+                );
+        }
         Promise::new(self.token.clone())
             .function_call(
                 "storage_deposit".to_string(),
@@ -419,7 +481,93 @@ impl AgentVault {
         day: u64,
         job_id: Option<String>,
     ) -> bool {
-        if transfer_succeeded() {
+        self.settle_payment(
+            transfer_succeeded(),
+            agent_pk,
+            deposit_address,
+            amount,
+            day,
+            job_id,
+        )
+    }
+
+    /// Settles an INTENTS-rail payment. `ft_transfer_call` returns the amount the verifier kept
+    /// (the token contract refunds the rest), so only a full deposit counts as paid. A partial
+    /// deposit is treated as paid for the kept part, and the rest is returned to its source.
+    #[private]
+    pub fn on_intents_deposit_complete(
+        &mut self,
+        agent_pk: PublicKey,
+        deposit_address: String,
+        amount: U128,
+        day: u64,
+        job_id: Option<String>,
+    ) -> bool {
+        let used = intents_deposit_used();
+        if used >= amount.0 {
+            return self.settle_payment(true, agent_pk, deposit_address, amount, day, job_id);
+        }
+        if used == 0 {
+            return self.settle_payment(false, agent_pk, deposit_address, amount, day, job_id);
+        }
+        let unsent = amount.0 - used;
+        match &job_id {
+            Some(id) => self.restore_job(id, &agent_pk, unsent),
+            None => {
+                self.in_flight = self.in_flight.saturating_sub(unsent);
+                self.pool += unsent;
+            }
+        }
+        emit(
+            "payment_partial",
+            near_sdk::serde_json::json!({ "deposit_address": deposit_address, "amount": amount, "deposited": U128(used), "job_id": job_id }),
+        );
+        self.settle_payment(true, agent_pk, deposit_address, U128(used), day, job_id)
+    }
+
+    /// Owner: pulls tokens from this vault's own balance inside the NEAR Intents verifier (for
+    /// example 1Click refunds of INTENTS quotes) back to the vault. Call `sync_balance` after it
+    /// completes to credit them to the pool.
+    pub fn withdraw_from_intents(&mut self, amount: U128) -> Promise {
+        self.assert_owner();
+        require!(amount.0 > 0, "amount must be positive");
+        Promise::new(self.intents_contract.clone()).function_call(
+            "ft_withdraw".to_string(),
+            near_sdk::serde_json::json!({
+                "token": self.token,
+                "receiver_id": env::current_account_id(),
+                "amount": amount,
+                "memo": "beeline:intents-refund",
+            })
+            .to_string()
+            .into_bytes(),
+            NearToken::from_yoctonear(1),
+            GAS_INTENTS_WITHDRAW,
+        )
+    }
+
+    /// Owner: sets the NEAR Intents verifier account (default `intents.near`).
+    pub fn set_intents_contract(&mut self, account_id: AccountId) {
+        self.assert_owner();
+        emit(
+            "intents_contract_set",
+            near_sdk::serde_json::json!({ "account_id": account_id }),
+        );
+        self.intents_contract = account_id;
+    }
+}
+
+impl AgentVault {
+    fn settle_payment(
+        &mut self,
+        ok: bool,
+        agent_pk: PublicKey,
+        deposit_address: String,
+        amount: U128,
+        day: u64,
+        job_id: Option<String>,
+    ) -> bool {
+        if ok {
             self.in_flight = self.in_flight.saturating_sub(amount.0);
             self.completed_out += amount.0;
             emit(
@@ -449,7 +597,10 @@ impl AgentVault {
         );
         false
     }
+}
 
+#[near]
+impl AgentVault {
     // ----- Owner administration ----------------------------------------------------------
 
     pub(crate) fn assert_owner(&self) {
@@ -602,6 +753,7 @@ impl AgentVault {
             max_quote_age_secs: self.max_quote_age_secs,
             min_deadline_margin_secs: self.min_deadline_margin_secs,
             paused: self.paused,
+            intents_contract: self.intents_contract.clone(),
         }
     }
 

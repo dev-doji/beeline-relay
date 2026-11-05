@@ -164,6 +164,8 @@ The same NEAR → Base `ORIGIN_CHAIN` quote worked on 2026-11-04 (section 6a). A
 
 **What it means for the vault.** Today the vault pays an `ORIGIN_CHAIN` quote with `storage_deposit` + `ft_transfer` to the deposit account. To pay an `INTENTS` quote instead, it would deposit into the Intents verifier on behalf of the deposit address. The verifier docs (deposits page) say: `ft_transfer_call` on the token with `receiver_id: "intents.near"`, `msg: "<account id>"`, which assigns ownership of the deposited tokens to that account. Refunds with `refundType: INTENTS` would land in the vault's own balance inside `intents.near`, and withdrawing them needs the verifier's withdraw method (not documented on the deposits page; to verify).
 
+**Implemented (2026-11-05):** the vault pays `INTENTS` quotes this way (`contracts/agent-vault/README.md`, "Two payment rails"), and the API's USDC NEAR → Base route requests `depositType/refundType: INTENTS`. The verifier source (`near/intents`, `contracts/defuse/src/contract/tokens/nep141/deposit.rs` and `withdraw.rs`) confirms `ft_on_transfer` takes `msg` as the internal recipient, and that `ft_withdraw(token, receiver_id, amount, memo, msg)` with 1 yoctoNEAR is callable by the account owner.
+
 **Not verified yet:** that 1Click detects an `ft_transfer_call` deposit made *on behalf of* the deposit address as funding an `INTENTS` quote. This needs one small live mainnet payment.
 
 ## 7. Open questions to settle on Day 1–2

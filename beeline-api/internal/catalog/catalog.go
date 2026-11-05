@@ -27,6 +27,12 @@ type Route struct {
 	ID          string `json:"id"`
 	Source      Asset  `json:"source"`
 	Destination Asset  `json:"destination"`
+	// 1Click rails for this route. NEAR-side legs go through the NEAR Intents verifier
+	// (INTENTS): on 2026-11-05 1Click stopped quoting NEAR ORIGIN_CHAIN deposits and NEAR
+	// DESTINATION_CHAIN delivery (docs/NEAR_INTENTS_ROUTE.md section 6b).
+	DepositType   string `json:"deposit_type"`
+	RefundType    string `json:"refund_type"`
+	RecipientType string `json:"recipient_type"`
 }
 
 type Catalog struct {
@@ -63,8 +69,14 @@ func Default() *Catalog {
 		networks: []Network{{ID: NetworkNEAR, Name: "NEAR"}, {ID: NetworkBase, Name: "Base"}},
 		assets:   []Asset{usdcNEAR, usdcBase},
 		routes: []Route{
-			{ID: "usdc-near-to-usdc-base", Source: usdcNEAR, Destination: usdcBase},
-			{ID: "usdc-base-to-usdc-near", Source: usdcBase, Destination: usdcNEAR},
+			{
+				ID: "usdc-near-to-usdc-base", Source: usdcNEAR, Destination: usdcBase,
+				DepositType: "INTENTS", RefundType: "INTENTS", RecipientType: "DESTINATION_CHAIN",
+			},
+			{
+				ID: "usdc-base-to-usdc-near", Source: usdcBase, Destination: usdcNEAR,
+				DepositType: "ORIGIN_CHAIN", RefundType: "ORIGIN_CHAIN", RecipientType: "INTENTS",
+			},
 		},
 	}
 }

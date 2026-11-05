@@ -38,7 +38,8 @@ Every refusal is a failed NEAR transaction with a `BEELINE_VAULT_REJECTED: <reas
 | Swarm job escrow (fund, member caps, close and refund to the funder only) | ✅ Implemented and unit-tested. ❌ Not deployed yet. |
 | API: live 1Click quotes, idempotent payment sessions, state machine, events, API keys, workspace isolation | ✅ Implemented. Unit-tested, and integration-tested on PostgreSQL. A live 1Click quote was fetched on 2026-11-04 (no funds moved). |
 | Testnet rehearsal: deploy, an allowed payment, four attacks rejected on-chain | ⏳ Script ready (`scripts/testnet-rehearsal.ps1`), not run yet |
-| Live mainnet payment (USDC NEAR → USDC Base) | ❌ Not done yet. As of 2026-11-05, 1Click quotes NEAR-origin payments only through the Intents verifier (`depositType: INTENTS`). The vault currently pays `ORIGIN_CHAIN` quotes, so an `INTENTS` pay path is being added (see [docs/NEAR_INTENTS_ROUTE.md](docs/NEAR_INTENTS_ROUTE.md) section 6b). |
+| Two payment rails in the vault: `ORIGIN_CHAIN` (token sent to the 1Click deposit account) and `INTENTS` (`ft_transfer_call` into the NEAR Intents verifier on behalf of the deposit address; refunds land in the vault's Intents balance and `withdraw_from_intents` pulls them back) | ✅ Implemented and unit-tested. A **real** 1Click `INTENTS` quote fetched on 2026-11-05 verifies in Go and on-chain code. Since 2026-11-05, 1Click quotes NEAR-origin payments only on the `INTENTS` rail ([docs/NEAR_INTENTS_ROUTE.md](docs/NEAR_INTENTS_ROUTE.md) section 6b), and the API now requests that rail for USDC NEAR → Base. |
+| Live mainnet payment (USDC NEAR → USDC Base) | ❌ Not done yet. One small payment will confirm that 1Click picks up an on-behalf-of verifier deposit. |
 | Reconciliation, evidence export | ⏳ Planned |
 | MCP server and demo swarm agents | ⏳ Planned |
 | Console | ⏳ Planned |
@@ -52,7 +53,7 @@ Requirements: Go 1.27+ and Rust (stable).
 ```bash
 git clone https://github.com/dev-doji/beeline-relay && cd beeline-relay
 
-# Vault contract: policy, attack, escrow and AI-reviewer tests, including 2 real NEAR AI signatures (54 tests)
+# Vault contract: policy, attack, escrow and AI-reviewer tests, including 2 real NEAR AI signatures and 2 real 1Click quotes (63 tests)
 cd contracts/agent-vault && cargo test && cd ../..
 
 # API and NEAR AI client tests. Database integration tests skip unless TEST_DATABASE_URL is set.

@@ -70,6 +70,8 @@ struct Q {
     dry: bool,
     issued: u64,
     deadline: u64,
+    deposit_type: String,
+    refund_type: String,
 }
 
 impl Q {
@@ -85,7 +87,17 @@ impl Q {
             dry: false,
             issued: T0,
             deadline: T0 + 3 * 24 * 60 * MIN,
+            deposit_type: "ORIGIN_CHAIN".into(),
+            refund_type: "ORIGIN_CHAIN".into(),
         }
+    }
+
+    /// A quote funded through the NEAR Intents verifier (depositType/refundType INTENTS).
+    fn intents(amount: u128, deposit: &str) -> Self {
+        let mut q = Q::new(amount, deposit);
+        q.deposit_type = "INTENTS".into();
+        q.refund_type = "INTENTS".into();
+        q
     }
 
     fn unsigned_json(&self, signature: &str) -> String {
@@ -95,9 +107,9 @@ impl Q {
             "signature": signature,
             "quoteRequest": {
                 "dry": self.dry, "swapType": "EXACT_INPUT", "slippageTolerance": 100,
-                "originAsset": self.origin_asset, "depositType": "ORIGIN_CHAIN",
+                "originAsset": self.origin_asset, "depositType": self.deposit_type,
                 "destinationAsset": self.dest_asset, "amount": self.amount,
-                "refundTo": self.refund_to, "refundType": "ORIGIN_CHAIN",
+                "refundTo": self.refund_to, "refundType": self.refund_type,
                 "recipient": self.recipient, "recipientType": "DESTINATION_CHAIN",
                 "deadline": iso(self.issued + 10 * MIN), "quoteWaitingTimeMs": 0,
                 "appFees": [{"fee": 1, "recipient": "fees.near"}]
@@ -1112,4 +1124,182 @@ fn jobs_are_listed() {
     assert_eq!(jobs.len(), 1);
     assert_eq!(jobs[0].0, JOB);
     assert_eq!(jobs[0].1.funded, U128(JOB_BUDGET));
+}
+
+// --- INTENTS rail: funding a quote through the NEAR Intents verifier ---------------------
+
+/// Created function calls as readable text: "receiver method args" per call.
+fn receipts_debug() -> String {
+    let mut out = String::new();
+    for r in near_sdk::test_utils::get_created_receipts() {
+        for a in r.actions {
+            if let near_sdk::mock::MockAction::FunctionCallWeight {
+                method_name, args, ..
+            } = a
+            {
+                out.push_str(&format!(
+                    "{} {} {}\n",
+                    r.receiver_id,
+                    String::from_utf8_lossy(&method_name),
+                    String::from_utf8_lossy(&args)
+                ));
+            }
+        }
+    }
+    out
+}
+
+fn used_result(used: u128) -> PromiseResult {
+    PromiseResult::Successful(format!("\"{used}\"").into_bytes())
+}
+
+#[test]
+fn intents_quote_is_paid_with_ft_transfer_call_to_the_verifier() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    assert!(v.is_deposit_used(DEPOSIT_1.into()));
+    let r = receipts_debug();
+    assert!(r.contains("ft_transfer_call"), "{r}");
+    assert!(
+        !r.contains("storage_deposit"),
+        "no deposit-account registration on the INTENTS rail"
+    );
+    assert!(r.contains(r#""receiver_id":"intents.near""#), "{r}");
+    assert!(r.contains(&format!(r#""msg":"{DEPOSIT_1}""#)), "{r}");
+    assert!(
+        r.contains(DEPOSIT_1),
+        "msg must name the deposit address: {r}"
+    );
+}
+
+#[test]
+fn intents_quote_must_refund_on_the_same_rail_to_the_vault() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    let mut q = Q::intents(1_000_000, DEPOSIT_1);
+    q.refund_type = "ORIGIN_CHAIN".into();
+    assert_rejected(&mut v, q.signed(), "refunds must return to this vault");
+    let mut q = Q::intents(1_000_000, DEPOSIT_1);
+    q.refund_to = "attacker.near".into();
+    assert_rejected(&mut v, q.signed(), "refunds must return to this vault");
+}
+
+#[test]
+fn other_deposit_types_are_rejected() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    let mut q = Q::new(1_000_000, DEPOSIT_1);
+    q.deposit_type = "CONFIDENTIAL_INTENTS".into();
+    q.refund_type = "CONFIDENTIAL_INTENTS".into();
+    assert_rejected(&mut v, q.signed(), "only ORIGIN_CHAIN or INTENTS deposits");
+}
+
+#[test]
+fn intents_rail_keeps_every_other_guardrail() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    let mut q = Q::intents(1_000_000, DEPOSIT_1);
+    q.recipient = ATTACKER.into();
+    assert_rejected(&mut v, q.signed(), "not on the allowlist");
+    assert_rejected(
+        &mut v,
+        Q::intents(1_000_000, DEPOSIT_1).signed_with(&SigningKey::from_bytes(&[42u8; 32])),
+        "signature is not from 1Click",
+    );
+    assert_rejected(
+        &mut v,
+        Q::intents(6_000_000, DEPOSIT_1).signed(),
+        "per-payment limit",
+    );
+}
+
+#[test]
+fn full_intents_deposit_counts_as_paid() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    callback_env(used_result(1_000_000));
+    assert!(v.on_intents_deposit_complete(
+        agent_key(1),
+        DEPOSIT_1.into(),
+        U128(1_000_000),
+        T0 / NS_PER_DAY,
+        None
+    ));
+    assert!(v.is_deposit_used(DEPOSIT_1.into()));
+    assert_eq!(v.get_balances().in_flight, U128(0));
+}
+
+#[test]
+fn refused_intents_deposit_restores_everything() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    let pool_before = v.get_balances().pool;
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    // The verifier rejected the deposit: the token contract refunded it all (used = 0).
+    callback_env(used_result(0));
+    assert!(!v.on_intents_deposit_complete(
+        agent_key(1),
+        DEPOSIT_1.into(),
+        U128(1_000_000),
+        T0 / NS_PER_DAY,
+        None
+    ));
+    assert!(!v.is_deposit_used(DEPOSIT_1.into()));
+    assert_eq!(v.get_balances().pool, pool_before);
+    let (_, agent) = v.get_agents().into_iter().next().unwrap();
+    assert_eq!(agent.spent_today, U128(0));
+    // A failed call (no result at all) is treated the same way.
+    as_agent(1, T0 + MIN);
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    callback_env(PromiseResult::Failed);
+    assert!(!v.on_intents_deposit_complete(
+        agent_key(1),
+        DEPOSIT_1.into(),
+        U128(1_000_000),
+        T0 / NS_PER_DAY,
+        None
+    ));
+    assert_eq!(v.get_balances().pool, pool_before);
+}
+
+#[test]
+fn partial_intents_deposit_returns_the_rest() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    let pool_before = v.get_balances().pool.0;
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    callback_env(used_result(400_000));
+    assert!(v.on_intents_deposit_complete(
+        agent_key(1),
+        DEPOSIT_1.into(),
+        U128(1_000_000),
+        T0 / NS_PER_DAY,
+        None
+    ));
+    let b = v.get_balances();
+    assert_eq!(b.pool.0, pool_before - 400_000);
+    assert_eq!(b.in_flight, U128(0));
+    assert!(v.is_deposit_used(DEPOSIT_1.into()));
+    assert!(get_logs().iter().any(|l| l.contains("payment_partial")));
+}
+
+#[test]
+fn intents_admin_is_owner_only() {
+    let mut v = setup();
+    assert_eq!(v.get_config().intents_contract.as_str(), "intents.near");
+    as_agent(1, T0 + MIN);
+    assert!(rejection(|| {
+        let _ = v.withdraw_from_intents(U128(1));
+    })
+    .contains("owner only"));
+    assert!(
+        rejection(|| v.set_intents_contract("evil.near".parse().unwrap())).contains("owner only")
+    );
+    as_owner(T0);
+    let _ = v.withdraw_from_intents(U128(1));
+    assert!(receipts_debug().contains("ft_withdraw"));
+    v.set_intents_contract("intents.testnet".parse().unwrap());
+    assert_eq!(v.get_config().intents_contract.as_str(), "intents.testnet");
 }

@@ -251,6 +251,21 @@ mod tests {
 
     pub const ONE_CLICK_KEY: &str = "ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc";
 
+    /// A real INTENTS-deposit quote (NEAR USDC via the Intents verifier to Base), fetched live on
+    /// 2026-11-05 after 1Click stopped quoting NEAR ORIGIN_CHAIN deposits.
+    #[test]
+    fn live_intents_quote_signature_verifies() {
+        let raw = include_str!("testdata/live_intents_quote.json");
+        let q = parse(raw).unwrap();
+        let key = decode_ed25519::<32>(ONE_CLICK_KEY).unwrap();
+        assert!(verify(&q, &key), "real 1Click INTENTS quote must verify");
+        assert_eq!(q.deposit_type, "INTENTS");
+        assert_eq!(q.refund_type, "INTENTS");
+        assert_eq!(q.deposit_address.len(), 64);
+        let tampered = raw.replace(&q.deposit_address, &"a".repeat(64));
+        assert!(!verify(&parse(&tampered).unwrap(), &key));
+    }
+
     #[test]
     fn live_quote_signature_verifies() {
         let q = parse(LIVE_QUOTE).unwrap();

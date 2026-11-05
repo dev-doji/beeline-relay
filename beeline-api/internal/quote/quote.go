@@ -134,13 +134,13 @@ func (s *Service) Create(ctx context.Context, workspaceID string, in CreateInput
 		SwapType:          "EXACT_INPUT",
 		SlippageTolerance: slippageBps,
 		OriginAsset:       route.Source.ID,
-		DepositType:       "ORIGIN_CHAIN",
+		DepositType:       route.DepositType,
 		DestinationAsset:  route.Destination.ID,
 		Amount:            in.SourceAmount,
 		RefundTo:          in.RefundAddress,
-		RefundType:        "ORIGIN_CHAIN",
+		RefundType:        route.RefundType,
 		Recipient:         in.DestinationAddress,
-		RecipientType:     "DESTINATION_CHAIN",
+		RecipientType:     route.RecipientType,
 		Deadline:          now.Add(DefaultTTL).Format(time.RFC3339Nano),
 	}
 	resp, err := s.Provider.Quote(ctx, req)

@@ -27,6 +27,17 @@ Every rejection is a failed transaction with a `BEELINE_VAULT_REJECTED: <reason>
 
 1Click signs `base58(sha256(stableStringify({...signedRequest, ...signedQuote, timestamp})))` with ed25519. The field list and the public key (`ed25519:reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc`) come from the official SDK, `defuse-protocol/one-click-sdk-typescript/src/quote-signature.ts`. `src/quote.rs` reproduces it, and a unit test verifies a **real** 1Click quote with the real key. The Go API has the same implementation, tested against the same quote.
 
+## Two payment rails
+
+1Click quotes say how they're funded (`depositType`), and the vault supports both rails:
+
+| `depositType` | How the vault pays | Where refunds go (`refundType` must match, `refundTo` must be the vault) |
+|---|---|---|
+| `ORIGIN_CHAIN` | `storage_deposit` + `ft_transfer` of the token to the quote's deposit account | Back to the vault on NEAR (credit with `sync_balance`) |
+| `INTENTS` | `ft_transfer_call` to the NEAR Intents verifier (`intents.near`) with `msg` = the deposit address. The verifier credits that address (its `ft_on_transfer` treats `msg` as the internal recipient). | The vault's own balance inside the verifier. `withdraw_from_intents(amount)` calls the verifier's `ft_withdraw` to bring it back, then `sync_balance` |
+
+For `INTENTS`, the callback reads the amount `ft_transfer_call` reports as used. A full deposit counts as paid, zero restores everything (budget, single-use, funds), and a partial deposit is paid for the used part while the rest is returned. Every other check is the same on both rails. Since 2026-11-05, 1Click quotes NEAR-origin payments only on the `INTENTS` rail (see `docs/NEAR_INTENTS_ROUTE.md` section 6b). A real `INTENTS` quote is verified in `quote.rs` (`live_intents_quote_signature_verifies`).
+
 ## How the AI reviewer is checked
 
 Allowlists can't catch a payment to an *allowed* recipient for the *wrong reason*, for example an injected "urgent prepayment". For payments at or above `threshold`, the agent must attach a review from a reviewer model on [NEAR AI Cloud](https://docs.near.ai/cloud/verification), whose models run in TEEs and sign every completion. NEAR AI signs `{model}:{sha256(request)}:{sha256(response)}` with an ed25519 key (`provider_tee` signatures, `signing_algo=ed25519`). The agent submits the exact request and response bytes and the signature, and `src/review.rs` checks that:
@@ -56,23 +67,24 @@ There's no marketplace or bidding. Who hires whom, and what the work is, happens
 | Method | Who | Purpose |
 |---|---|---|
 | `new(owner, token, quote_signer, max_per_payment, daily_limit_per_agent, allowed_recipients, allowed_destination_assets)` | deployer | Initialize |
-| `pay_quote(quote_json, review?, job_id?)` | agent key | Verify and pay a 1Click quote's deposit address. `review` = `{request, response, signature}` is needed at or above the reviewer threshold. With `job_id`, the payment comes from that job's escrow; otherwise from the pool. |
+| `pay_quote(quote_json, review?, job_id?)` | agent key | Verify and pay a 1Click quote's deposit address, on the `ORIGIN_CHAIN` or `INTENTS` rail. `review` = `{request, response, signature}` is needed at or above the reviewer threshold. With `job_id`, the payment comes from that job's escrow; otherwise from the pool. |
 | `ft_on_transfer(sender_id, amount, msg)` | token contract | Fund the pool (`msg` empty) or a job (`{"fund_job":"<id>"}`, funder only) |
 | `create_job(job_id, funder, members[{public_key, cap}], recipients, expires_at_secs)` | owner | Open a swarm job |
 | `close_job(job_id)` | owner, funder, or anyone after expiry | Close and refund the rest to the funder |
 | `sync_balance()` | owner | Credit untracked tokens (refunds, mints) to the pool |
+| `withdraw_from_intents(amount)` / `set_intents_contract(account_id)` | owner | Pull refunds out of the vault's NEAR Intents balance / set the verifier account (default `intents.near`) |
 | `add_agent(public_key, label)` / `revoke_agent(public_key)` | owner | Issue or delete an agent's function-call key |
 | `set_reviewer(model, signing_key, policy_prompt_sha256, threshold)` / `clear_reviewer()` | owner | Require an AI reviewer approval above a threshold (hex key and hash) |
 | `set_limits`, `set_freshness`, `add_recipient`, `remove_recipient`, `add_destination_asset`, `set_paused` | owner | Administration |
 | `withdraw(amount, receiver_id)` | owner | Withdraw from the pool only |
 | `get_config`, `get_reviewer`, `get_recipients`, `get_agents`, `is_deposit_used`, `get_balances`, `get_job`, `get_jobs` | anyone | Views |
 
-Events use NEP-297 (`EVENT_JSON:`, standard `beeline-agent-vault`): `payment_requested`, `payment_sent`, `payment_failed`, `review_approved`, `agent_added`, `agent_revoked`, `reviewer_set`, `reviewer_cleared`, `paused`, `pool_funded`, `pool_synced`, `balance_shortfall`, `job_created`, `job_funded`, `job_closed`, `job_refunded`, `job_refund_failed`. Payment events carry `job_id` when paid from a job.
+Events use NEP-297 (`EVENT_JSON:`, standard `beeline-agent-vault`): `payment_requested`, `payment_sent`, `payment_failed`, `review_approved`, `agent_added`, `agent_revoked`, `reviewer_set`, `reviewer_cleared`, `paused`, `pool_funded`, `pool_synced`, `balance_shortfall`, `job_created`, `job_funded`, `job_closed`, `job_refunded`, `job_refund_failed`, `payment_partial`, `intents_contract_set`. Payment events carry `job_id` when paid from a job.
 
 ## Build and test
 
 ```bash
-cargo test                                   # 54 unit tests
+cargo test                                   # 63 unit tests
 cargo near build non-reproducible-wasm       # optimized wasm for deployment
 ```
 
