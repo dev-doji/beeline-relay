@@ -38,7 +38,7 @@ Every refusal is a failed NEAR transaction with a `BEELINE_VAULT_REJECTED: <reas
 | Swarm job escrow (fund, member caps, close and refund to the funder only) | ✅ Implemented and unit-tested. ❌ Not deployed yet. |
 | API: live 1Click quotes, idempotent payment sessions, state machine, events, API keys, workspace isolation | ✅ Implemented. Unit-tested, and integration-tested on PostgreSQL. A live 1Click quote was fetched on 2026-11-04 (no funds moved). |
 | Testnet rehearsal: deploy, an allowed payment, four attacks rejected on-chain | ⏳ Script ready (`scripts/testnet-rehearsal.ps1`), not run yet |
-| Live mainnet payment (USDC NEAR → USDC Base) | ❌ Not done yet |
+| Live mainnet payment (USDC NEAR → USDC Base) | ❌ Not done yet. As of 2026-11-05, 1Click quotes NEAR-origin payments only through the Intents verifier (`depositType: INTENTS`). The vault currently pays `ORIGIN_CHAIN` quotes, so an `INTENTS` pay path is being added (see [docs/NEAR_INTENTS_ROUTE.md](docs/NEAR_INTENTS_ROUTE.md) section 6b). |
 | Reconciliation, evidence export | ⏳ Planned |
 | MCP server and demo swarm agents | ⏳ Planned |
 | Console | ⏳ Planned |

@@ -148,6 +148,24 @@ The route is USDC on NEAR → USDC on Base: `ORIGIN_CHAIN` deposit, `EXACT_INPUT
 - **1Click extends the deadline.** We requested 10 minutes and the provider returned `deadline` 3 days out. Beeline keeps the *stricter* 10-minute expiry for creating payments.
 - **The deadline format is not the cause of failures.** RFC 3339 with milliseconds and with nanoseconds were both accepted.
 
+## 6b. Live findings (2026-11-05): NEAR-chain deposits now go through the Intents verifier
+
+These are dry quotes, plus one non-dry quote (no funds moved), sent to `https://1click.chaindefuser.com/v0/quote`, both with and without the partner JWT. Results were the same either way.
+
+| Route | Result |
+|---|---|
+| ETH USDC → Base USDC, Arb USDC → Base USDC, Base USDC → Arb USDC (`ORIGIN_CHAIN` → `DESTINATION_CHAIN`) | 201, quoted |
+| NEAR USDC → Base/Arbitrum USDC, NEAR USDC → NEAR USDT, wNEAR → Base USDC with `depositType: ORIGIN_CHAIN` | 400 "Quoting for this pair is not available" |
+| Base USDC → NEAR USDC with `recipientType: DESTINATION_CHAIN` | 400 "Quoting for this pair is not available" |
+| Base USDC → NEAR USDC with `recipientType: INTENTS` | 201, quoted |
+| **NEAR USDC with `depositType: INTENTS`, `refundType: INTENTS` → Base USDC (`DESTINATION_CHAIN`)** | **201, quoted. The non-dry quote is signed, with a 64-hex `depositAddress` and no memo, `timeEstimate` 12s.** |
+
+The same NEAR → Base `ORIGIN_CHAIN` quote worked on 2026-11-04 (section 6a). Adding `confidentiality: basic|advanced` didn't change the result. The changelog has no entry for this (its last entry is the 2026-10-27 confidential settlement). **We don't know whether this is a temporary outage of NEAR-chain deposits or a lasting change.**
+
+**What it means for the vault.** Today the vault pays an `ORIGIN_CHAIN` quote with `storage_deposit` + `ft_transfer` to the deposit account. To pay an `INTENTS` quote instead, it would deposit into the Intents verifier on behalf of the deposit address. The verifier docs (deposits page) say: `ft_transfer_call` on the token with `receiver_id: "intents.near"`, `msg: "<account id>"`, which assigns ownership of the deposited tokens to that account. Refunds with `refundType: INTENTS` would land in the vault's own balance inside `intents.near`, and withdrawing them needs the verifier's withdraw method (not documented on the deposits page; to verify).
+
+**Not verified yet:** that 1Click detects an `ft_transfer_call` deposit made *on behalf of* the deposit address as funding an `INTENTS` quote. This needs one small live mainnet payment.
+
 ## 7. Open questions to settle on Day 1–2
 1. Is a partner JWT required for non-dry quotes or status in practice? (Dry quotes and status work without one today.)
 2. Where is the 1Click signing public key published, so we can verify quote signatures in Go?
