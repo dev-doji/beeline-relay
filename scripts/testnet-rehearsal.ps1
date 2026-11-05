@@ -92,7 +92,8 @@ Ensure "Creating $Vault (if it already exists from an earlier run, use a new -Ow
 Step 3 'Download the contract built by CI (agent_vault.wasm) from GitHub'
 $wasmDir = Join-Path $Work 'wasm'
 if (Test-Path $wasmDir) { Remove-Item -Recurse -Force $wasmDir }
-& gh run download --repo dev-doji/beeline-relay --name agent-vault-wasm --dir $wasmDir
+$runId = & gh run list --repo dev-doji/beeline-relay --branch main --workflow ci.yml --status success --limit 1 --json databaseId -q '.[0].databaseId'
+& gh run download $runId --repo dev-doji/beeline-relay --name agent-vault-wasm --dir $wasmDir
 Ensure 'Downloading the contract'
 $Wasm = Join-Path $wasmDir 'agent_vault.wasm'
 
