@@ -144,4 +144,9 @@ export const LAYER_LABEL: Record<string, string> = {
   vault_policy: "Vault policy",
 };
 
+/** "reviews every payment" or "reviews payments from X USDC". */
+export function reviewScope(threshold: string): string {
+  return /^0*1$/.test(threshold) ? "reviews every payment" : `reviews payments from ${formatUSDC(threshold)} USDC`;
+}
+
 export const shortKey = (s: string, n = 6) => (s.length > n * 2 + 1 ? `${s.slice(0, n)}…${s.slice(-n)}` : s);
