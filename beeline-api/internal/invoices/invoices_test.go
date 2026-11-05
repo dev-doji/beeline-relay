@@ -7,8 +7,8 @@ import (
 
 func valid() CreateInput {
 	return CreateInput{
-		VendorName: "Ada Fabrics", VendorHandle: "@adafabrics", Payout: "ada-fabrics.goni-beeline.testnet",
-		Memo: "Order #18", Items: []Item{{Name: "Ankara dress", Quantity: 3, UnitPrice: "150000"}, {Name: "Delivery", Quantity: 1, UnitPrice: "50000"}},
+		VendorName: "MS Clothing", VendorHandle: "@msclothing", Payout: "ms-clothing.goni-beeline.testnet",
+		Memo: "Order #18", Items: []Item{{Name: "Linen shirt", Quantity: 3, UnitPrice: "150000"}, {Name: "Delivery", Quantity: 1, UnitPrice: "50000"}},
 	}
 }
 

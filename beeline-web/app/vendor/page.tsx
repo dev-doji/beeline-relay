@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { ArrowRight, Check, Copy, ExternalLink, MessageCircle, Plus, Store, Trash2 } from "lucide-react";
 import { Receipt, lineTotal } from "@/components/invoice/Receipt";
-import { ApiError, DEMO_VENDOR_PAYOUT, type Invoice, type InvoiceItem, createInvoice, toBaseUnits } from "@/lib/api";
+import { ApiError, type Invoice, type InvoiceItem, createInvoice, getPlayground, toBaseUnits } from "@/lib/api";
 
 interface DraftItem {
   name: string;
@@ -14,15 +14,27 @@ interface DraftItem {
 }
 
 const START: DraftItem[] = [
-  { name: "Ankara dress", quantity: "3", price: "0.15" },
-  { name: "Delivery (Lekki)", quantity: "1", price: "0.05" },
+  { name: "Linen shirt", quantity: "3", price: "0.15" },
+  { name: "Express delivery", quantity: "1", price: "0.05" },
 ];
 
+const NEAR_ACCOUNT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
+
 export default function VendorPage() {
-  const [vendor, setVendor] = useState("Ada Fabrics");
-  const [handle, setHandle] = useState("@adafabrics");
-  const [memo, setMemo] = useState("Order #18 for Chioma");
-  const [payout, setPayout] = useState(DEMO_VENDOR_PAYOUT);
+  const [vendor, setVendor] = useState("MS Clothing");
+  const [handle, setHandle] = useState("@msclothing");
+  const [memo, setMemo] = useState("Order #1842");
+  const [payout, setPayout] = useState("");
+
+  // The demo vendor's real testnet account (ms-clothing.<owner>), read from the API.
+  useEffect(() => {
+    getPlayground()
+      .then((st) => {
+        const v = st.accounts.find((a) => a.role === "vendor");
+        if (v) setPayout((p) => p || v.account);
+      })
+      .catch(() => undefined);
+  }, []);
   const [items, setItems] = useState<DraftItem[]>(START);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +54,7 @@ export default function VendorPage() {
     [items],
   );
   const overCap = BigInt(total) > 5_000_000n;
-  const payoutOk = /^0x[0-9a-fA-F]{40}$/.test(payout);
+  const payoutOk = payout.length >= 2 && payout.length <= 64 && NEAR_ACCOUNT.test(payout);
 
   const link = created && typeof window !== "undefined" ? `${window.location.origin}/pay/${created.id}` : "";
 
@@ -80,7 +92,8 @@ export default function VendorPage() {
         <h1>Send a pay link that can’t be hijacked</h1>
         <p>
           Create an invoice like you would on Instagram or WhatsApp. Beeline signs it, so if a scammer copies your link and
-          swaps in their wallet, or changes the amount, the payment is refused on-chain.
+          swaps in their account, or changes the amount, the payment is refused on-chain. Genuine payments land in your real
+          testnet account.
         </p>
       </div>
 
@@ -98,12 +111,12 @@ export default function VendorPage() {
             </label>
           </div>
           <label className="field">
-            Payout address (Base)
-            <input value={payout} spellCheck={false} onChange={(e) => (setPayout(e.target.value.trim()), setCreated(null))} />
+            Payout account (NEAR testnet)
+            <input value={payout} spellCheck={false} onChange={(e) => (setPayout(e.target.value.trim().toLowerCase()), setCreated(null))} />
             {payoutOk ? (
-              <span className="help">A demo vendor wallet. It is NOT on the vault’s approved list; the signed invoice is what allows the payment.</span>
+              <span className="help">A real testnet account. It is NOT on the vault’s approved list: only the signed invoice lets Bee pay it, and the money really lands there.</span>
             ) : (
-              <span className="err">Enter a 0x address (40 hex characters).</span>
+              <span className="err">Enter a NEAR account, e.g. ms-clothing.yourname.testnet</span>
             )}
           </label>
           <label className="field">

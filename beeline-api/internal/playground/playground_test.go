@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	acme    = "acme.goni-beeline.testnet"
-	ada     = "ada-fabrics.goni-beeline.testnet"
+	acme    = "claw-electronics.goni-beeline.testnet"
+	ada     = "ms-clothing.goni-beeline.testnet"
 	scammer = "scammer.goni-beeline.testnet"
 )
 
@@ -148,7 +148,7 @@ func newService(t *testing.T) (*Service, *fakeVault, ed25519.PrivateKey) {
 	}
 	s := &Service{
 		Cfg: Config{Network: "testnet", Vault: "vault.goni-beeline.testnet", Token: "usdc.fakes.testnet",
-			Approved: Account{"Acme Design", acme, "approved"}, Vendor: Account{"Ada Fabrics", ada, "vendor"}, Scammer: Account{"Scammer", scammer, "attacker"},
+			Approved: Account{"Claw Electronics", acme, "approved"}, Vendor: Account{"MS Clothing", ada, "vendor"}, Scammer: Account{"Scammer", scammer, "attacker"},
 			ExplorerTxURL: "https://x/txns/", AgentKey: near.Key{AccountID: "vault.goni-beeline.testnet", Private: agentKey}, InvoiceIssuer: issuer},
 		Chain: v, Reviewer: fakeReviewer{key: rk}, Agent: fakeBee{}, Now: time.Now,
 	}
@@ -211,10 +211,10 @@ func TestBeeCanJustReply(t *testing.T) {
 
 func TestInvoicePaymentsAndScams(t *testing.T) {
 	s, _, issuer := newService(t)
-	p := invoices.Payload{V: 1, ID: "inv_t", Vendor: "Ada Fabrics", Payout: ada, Asset: "nep141:usdc.fakes.testnet", Amount: "500000", ExpiresAt: 1, Memo: "Order #18"}
+	p := invoices.Payload{V: 1, ID: "inv_t", Vendor: "MS Clothing", Payout: ada, Asset: "nep141:usdc.fakes.testnet", Amount: "500000", ExpiresAt: 1, Memo: "Order #18"}
 	raw, _ := json.Marshal(p)
 	inv := &invoices.Invoice{ID: p.ID, VendorName: p.Vendor, Payout: ada, Amount: p.Amount, Memo: p.Memo, Payload: string(raw),
-		Signature: hex.EncodeToString(ed25519.Sign(issuer, raw)), Items: []invoices.Item{{Name: "Ankara dress", Quantity: 3, UnitPrice: "150000"}}}
+		Signature: hex.EncodeToString(ed25519.Sign(issuer, raw)), Items: []invoices.Item{{Name: "Linen shirt", Quantity: 3, UnitPrice: "150000"}}}
 	for _, tc := range []struct{ tamper, outcome, layer, recipient string }{
 		{TamperSwapPayout, "blocked", "invoice", scammer},
 		{TamperEditAmount, "blocked", "invoice", ada},

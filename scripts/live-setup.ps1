@@ -6,10 +6,10 @@
   Signed by YOUR testnet owner account through the NEAR CLI keychain. Testnet only.
     1. Upgrade the vault to the latest CI build (adds pay_direct; state is kept).
     2. Create three real testnet accounts for the demo (skipped if they exist):
-         acme.<owner>         an approved supplier
-         ada-fabrics.<owner>  a vendor who sends invoices (pay links)
-         scammer.<owner>      the attacker (never approved)
-    3. Approve acme.<owner> on the vault's allowlist.
+         claw-electronics.<owner>  an approved supplier (Claw Electronics)
+         ms-clothing.<owner>       a vendor who sends invoices (MS Clothing)
+         scammer.<owner>           the attacker (never approved)
+    3. Approve claw-electronics.<owner> on the vault's allowlist.
     4. Register the TESTNET invoice issuer key (signed pay links).
   Run after playground-setup.ps1.
 
@@ -66,8 +66,8 @@ Ensure 'Downloading the contract'
 & near contract deploy $Vault use-file (Join-Path $wasmDir 'agent_vault.wasm') without-init-call @Net sign-with-keychain send | Out-Host
 Ensure 'Upgrading the vault'
 
-Step 2 "Create the demo accounts acme.$Owner, ada-fabrics.$Owner and scammer.$Owner (0.05 test NEAR each)"
-foreach ($name in 'acme', 'ada-fabrics', 'scammer') {
+Step 2 "Create the demo accounts claw-electronics.$Owner, ms-clothing.$Owner and scammer.$Owner (0.05 test NEAR each)"
+foreach ($name in 'claw-electronics', 'ms-clothing', 'scammer') {
   $acct = "$name.$Owner"
   if (Test-Account $acct) {
     Write-Host "$acct already exists, skipping." -ForegroundColor DarkGray
@@ -77,9 +77,9 @@ foreach ($name in 'acme', 'ada-fabrics', 'scammer') {
   Ensure "Creating $acct"
 }
 
-Step 3 "Approve acme.$Owner on the vault's allowlist"
-& near contract call-function as-transaction $Vault add_recipient file-args (ArgsFile 'add-acme' @{ recipient = "acme.$Owner" }) prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' sign-as $Owner @Net sign-with-keychain send | Out-Host
-Ensure 'Approving acme'
+Step 3 "Approve claw-electronics.$Owner on the vault's allowlist"
+& near contract call-function as-transaction $Vault add_recipient file-args (ArgsFile 'add-claw' @{ recipient = "claw-electronics.$Owner" }) prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' sign-as $Owner @Net sign-with-keychain send | Out-Host
+Ensure 'Approving Claw Electronics'
 
 Step 4 'Register the TESTNET invoice issuer key (signed pay links)'
 Push-Location $Api

@@ -2,15 +2,16 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Bot, Coins, FlaskConical, Repeat, Replace } from "lucide-react";
+import { ArrowUpRight, Bot, Coins, FlaskConical, Repeat, Replace, Store } from "lucide-react";
 import { Receipt } from "@/components/invoice/Receipt";
 import { BotFrame, Thinking, Typewriter } from "@/components/chat/Chat";
-import { Outcome, QuoteCard, ReviewCard, VaultCard } from "@/components/chat/cards";
+import { Outcome, PlanCard, ReviewCard, VaultCard } from "@/components/chat/cards";
 import {
   ApiError,
   type Invoice,
   type PlaygroundState,
   type RunResult,
+  TX_URL,
   type Tamper,
   formatUSDC,
   getInvoice,
@@ -27,7 +28,7 @@ interface Attempt {
 }
 
 const TAMPERS: { id: Tamper; label: string; short: string; icon: React.ReactNode; hint: string }[] = [
-  { id: "swap_payout", label: "Pay a copy with the scammer’s wallet", short: "Swapped payout address", icon: <Replace size={16} />, hint: "A scammer forwards your link, but with their own address in it." },
+  { id: "swap_payout", label: "Pay a copy that sends it to the scammer", short: "Swapped payout account", icon: <Replace size={16} />, hint: "A scammer forwards your link, but with their own account in it." },
   { id: "edit_amount", label: "Pay a copy with 10× the amount", short: "Inflated amount", icon: <Coins size={16} />, hint: "The amount was changed after the vendor created the invoice." },
 ];
 
@@ -39,24 +40,31 @@ export default function PayPage({ params }: { params: Promise<{ id: string }> })
   const [current, setCurrent] = useState<Attempt | null>(null);
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<Attempt[]>([]);
+  const [prevBalance, setPrevBalance] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const [inv, st] = await Promise.all([getInvoice(id), getPlayground().catch(() => null)]);
-      setInvoice(inv);
-      setState(st);
-    } catch (e) {
-      setLoadError(e instanceof ApiError ? e.message : "Could not load this invoice.");
-    }
-  }, [id]);
+  const loadState = useCallback(async () => {
+    const st = await getPlayground().catch(() => null);
+    if (st) setState(st);
+    return st;
+  }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    (async () => {
+      try {
+        setInvoice(await getInvoice(id));
+        await loadState();
+      } catch (e) {
+        setLoadError(e instanceof ApiError ? e.message : "Could not load this invoice.");
+      }
+    })();
+  }, [id, loadState]);
+
+  const payee = invoice ? state?.accounts.find((a) => a.account === invoice.payout) : undefined;
 
   async function attempt(tamper: Tamper, label: string) {
     if (!invoice || busy) return;
     setBusy(true);
+    setPrevBalance(payee?.balance ?? null);
     const a: Attempt = { tamper, label };
     setCurrent(a);
     try {
@@ -65,9 +73,9 @@ export default function PayPage({ params }: { params: Promise<{ id: string }> })
       const done = { ...a, result: res.run };
       setCurrent(done);
       setHistory((h) => [done, ...h].slice(0, 6));
+      setTimeout(() => void loadState(), 1200);
     } catch (e) {
-      const done = { ...a, error: e instanceof ApiError ? e.message : "The payment attempt failed." };
-      setCurrent(done);
+      setCurrent({ ...a, error: e instanceof ApiError ? e.message : "The payment attempt failed." });
     } finally {
       setBusy(false);
       document.getElementById("attempt")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -99,6 +107,11 @@ export default function PayPage({ params }: { params: Promise<{ id: string }> })
   }
 
   const paid = invoice.status === "paid";
+  const gained =
+    prevBalance && payee?.balance && /^\d+$/.test(prevBalance) && /^\d+$/.test(payee.balance) && BigInt(payee.balance) > BigInt(prevBalance)
+      ? (BigInt(payee.balance) - BigInt(prevBalance)).toString()
+      : null;
+
   return (
     <div className="pay-wrap">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -123,8 +136,24 @@ export default function PayPage({ params }: { params: Promise<{ id: string }> })
         }}
       />
 
+      <a className={`acct role-vendor ${gained ? "changed" : ""}`} href={payee?.url ?? `https://testnet.nearblocks.io/address/${invoice.payout}`} target="_blank" rel="noreferrer">
+        <span className="acct-ic" aria-hidden>
+          <Store size={18} />
+        </span>
+        <span className="acct-main">
+          <b>{invoice.vendor_name}’s account</b>
+          <span className="mono">{shortKey(invoice.payout, 16)}</span>
+          <span className="acct-role">Live balance on NEAR testnet</span>
+        </span>
+        <span className="acct-bal">
+          {payee?.balance ? formatUSDC(payee.balance) : "—"}
+          <small>USDC</small>
+          {gained && <span className="delta up">+{formatUSDC(gained)}</span>}
+        </span>
+      </a>
+
       {paid && invoice.paid_tx && (
-        <a className="btn" href={`https://testnet.nearblocks.io/txns/${invoice.paid_tx}`} target="_blank" rel="noreferrer">
+        <a className="btn" href={TX_URL + invoice.paid_tx} target="_blank" rel="noreferrer">
           Paid on NEAR testnet · {shortKey(invoice.paid_tx, 6)} <ArrowUpRight size={16} aria-hidden />
         </a>
       )}
@@ -137,9 +166,9 @@ export default function PayPage({ params }: { params: Promise<{ id: string }> })
 
       <div className="lab">
         <h3>
-          <FlaskConical size={18} color="var(--bad)" aria-hidden /> Fraud lab: try to cheat this vendor
+          <FlaskConical size={18} color="var(--bad)" aria-hidden /> Fraud lab: try to cheat {invoice.vendor_name}
         </h3>
-        <p>Each button sends a real testnet transaction. The vault should refuse every one of them.</p>
+        <p>Each button sends a real testnet transaction with an edited copy of this link. The vault should refuse every one.</p>
         <div className="suggestions">
           {TAMPERS.map((t) => (
             <button key={t.id} className="suggestion danger" onClick={() => void attempt(t.id, t.short)} disabled={busy} title={t.hint}>
@@ -156,9 +185,7 @@ export default function PayPage({ params }: { params: Promise<{ id: string }> })
       </div>
 
       <div id="attempt" style={{ display: "grid", gap: 10, scrollMarginTop: 20 }}>
-        {current && !current.result && !current.error && (
-          <Thinking summary={`${current.label}: ${formatUSDC(invoice.amount)} USDC → ${invoice.vendor_name}`} reviewExpected={!!state?.reviewer} />
-        )}
+        {current && !current.result && !current.error && <Thinking invoice reviewExpected={!!state?.reviewer} />}
         {current?.error && (
           <BotFrame>
             <div className="bubble">{current.error}</div>
@@ -183,14 +210,16 @@ export default function PayPage({ params }: { params: Promise<{ id: string }> })
 
 function AttemptView({ attempt, invoice, state }: { attempt: Attempt; invoice: Invoice; state: PlaygroundState | null }) {
   const r = attempt.result!;
-  const quote = r.steps.find((s) => s.key === "quote");
+  const agent = r.steps.find((s) => s.key === "agent");
+  const request = r.steps.find((s) => s.key === "request");
   const review = r.steps.find((s) => s.key === "review");
+  const vault = r.steps.find((s) => s.key === "vault");
   const scam = attempt.tamper !== "none";
   const text =
     r.outcome === "paid"
-      ? `Paid. The vault verified ${invoice.vendor_name}’s signed invoice, the AI reviewer approved, and the money went to the vendor’s wallet only.`
+      ? `Paid. The vault verified ${invoice.vendor_name}’s signed invoice, the AI reviewer approved, and the money landed in ${invoice.vendor_name}’s real testnet account.`
       : scam
-        ? `Caught it. This copy of the link was edited (${attempt.label.toLowerCase()}), so the invoice signature no longer matches and the vault refused on-chain. ${invoice.vendor_name} keeps their money safe.`
+        ? `Caught it. This copy of the link was edited (${attempt.label.toLowerCase()}), so the invoice signature no longer matches and the vault refused on-chain. ${invoice.vendor_name}’s money is safe.`
         : r.outcome === "blocked"
           ? `The vault refused: ${r.reason}. No money moved.`
           : `This attempt didn’t finish: ${r.reason}.`;
@@ -199,10 +228,10 @@ function AttemptView({ attempt, invoice, state }: { attempt: Attempt; invoice: I
       <div className="bubble">
         <Typewriter text={text} />
       </div>
-      {quote && <QuoteCard step={quote} state={state} delay={200} payeeLabel={attempt.tamper === "swap_payout" ? "Scammer’s wallet" : invoice.vendor_name} />}
+      {request && <PlanCard agent={agent} request={request} state={state} delay={200} />}
       {review && <ReviewCard step={review} delay={450} />}
-      <VaultCard result={r} reviewStep={review} delay={700} invoiceMode />
-      <Outcome result={r} delay={1500} />
+      {vault && <VaultCard result={r} reviewStep={review} delay={700} invoiceMode />}
+      <Outcome result={r} state={state} delay={1500} />
     </BotFrame>
   );
 }

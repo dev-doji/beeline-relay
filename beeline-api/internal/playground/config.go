@@ -18,7 +18,7 @@ import (
 // FromEnv builds the playground config. It returns (nil, nil) when PLAYGROUND_VAULT is unset,
 // which disables the playground endpoints.
 //
-// The demo accounts default to acme.<owner>, ada-fabrics.<owner> and scammer.<owner> for a vault
+// The demo accounts default to claw-electronics.<owner>, ms-clothing.<owner> and scammer.<owner> for a vault
 // named vault.<owner> (scripts/live-setup.ps1 creates them). Keys come from
 // PLAYGROUND_AGENT_KEY / PLAYGROUND_INVOICE_ISSUER_KEY ("ed25519:<base58>") or from the files
 // agent-key.json / invoice-issuer.json in PLAYGROUND_KEYS_DIR. Both are TESTNET-only keys.
@@ -77,8 +77,8 @@ func FromEnv(lookup func(string) (string, bool)) (*Config, error) {
 		Network:         "testnet",
 		Vault:           vault,
 		Token:           get("PLAYGROUND_TOKEN", "usdc.fakes.testnet"),
-		Approved:        Account{Label: "Acme Design", Account: get("PLAYGROUND_APPROVED_ACCOUNT", "acme."+owner), Role: "approved"},
-		Vendor:          Account{Label: "Ada Fabrics", Account: get("PLAYGROUND_VENDOR_ACCOUNT", "ada-fabrics."+owner), Role: "vendor"},
+		Approved:        Account{Label: "Claw Electronics", Account: get("PLAYGROUND_APPROVED_ACCOUNT", "claw-electronics."+owner), Role: "approved"},
+		Vendor:          Account{Label: "MS Clothing", Account: get("PLAYGROUND_VENDOR_ACCOUNT", "ms-clothing."+owner), Role: "vendor"},
 		Scammer:         Account{Label: "Scammer", Account: get("PLAYGROUND_SCAMMER_ACCOUNT", "scammer."+owner), Role: "attacker"},
 		ExplorerTxURL:   "https://testnet.nearblocks.io/txns/",
 		ExplorerAcctURL: "https://testnet.nearblocks.io/address/",

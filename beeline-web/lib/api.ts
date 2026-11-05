@@ -1,21 +1,18 @@
 // Typed client for the Beeline API's public playground endpoints.
-// Types mirror beeline-api/internal/playground (State, Input, Step, Result).
+// Types mirror beeline-api/internal/playground (State, Input, Step, Result) and internal/invoices.
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080").replace(/\/$/, "");
 export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/dev-doji/beeline-relay";
+export const TX_URL = "https://testnet.nearblocks.io/txns/";
 
-export type Scenario = "honest" | "injected" | "attacker" | "forged" | "over_limit" | "replay" | "custom";
+export type Role = "approved" | "vendor" | "attacker" | "unknown";
 
-export interface Recipient {
+export interface LiveAccount {
   label: string;
-  address: string;
-}
-
-export interface RunInput {
-  scenario: Scenario;
-  task: string;
-  recipient: string;
-  amount: string;
+  account: string;
+  role: Role;
+  balance: string; // base units, "" if unknown
+  url: string;
 }
 
 export interface VaultConfig {
@@ -54,42 +51,49 @@ export interface PlaygroundState {
   vault_url: string;
   token: string;
   agent_public_key: string;
-  allowed_recipient: Recipient;
-  attacker_recipient: Recipient;
+  accounts: LiveAccount[];
   config: VaultConfig | null;
   recipients: string[] | null;
   reviewer: VaultReviewer | null;
   balances: VaultBalances | null;
   agents: [string, VaultAgent][] | null;
-  presets: Partial<Record<Scenario, Omit<RunInput, "scenario">>>;
+  invoice_issuer: string | null;
+  presets: Record<string, string>;
   disclosures: Record<string, string>;
 }
 
 export type StepStatus = "ok" | "blocked" | "skipped" | "error";
 
 export interface Step {
-  key: "quote" | "review" | "vault";
+  key: "agent" | "request" | "review" | "vault";
   title: string;
   status: StepStatus;
   detail: string;
-  label: "simulated" | "real" | "";
+  label: "real" | "";
   data?: Record<string, unknown>;
 }
 
 export interface RunResult {
-  scenario: Scenario;
-  outcome: "paid" | "blocked" | "error";
+  scenario: "chat" | "replay" | "invoice";
+  outcome: "paid" | "blocked" | "reply" | "error";
   reason: string;
   layer?: string;
+  reply?: string;
   tx_hash?: string;
   explorer_url?: string;
+  recipient?: string;
+  amount?: string;
   steps: Step[];
   started_at: string;
   duration_ms: number;
 }
 
 export class ApiError extends Error {
-  constructor(public code: string, message: string, public status: number) {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number,
+  ) {
     super(message);
   }
 }
@@ -103,7 +107,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       cache: "no-store",
     });
   } catch {
-    throw new ApiError("NETWORK", "Could not reach the Beeline API. Is it running?", 0);
+    throw new ApiError("NETWORK", "Could not reach the Beeline API. Start it with .\\scripts\\dev.ps1 and try again.", 0);
   }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
@@ -115,8 +119,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const getPlayground = () => request<PlaygroundState>("/api/v1/playground");
 
-export const runPlayground = (input: RunInput) =>
-  request<RunResult>("/api/v1/playground/runs", { method: "POST", body: JSON.stringify(input) });
+export const sendMessage = (message: string) =>
+  request<RunResult>("/api/v1/playground/runs", { method: "POST", body: JSON.stringify({ scenario: "chat", message }) });
+
+export const replayLast = () =>
+  request<RunResult>("/api/v1/playground/runs", { method: "POST", body: JSON.stringify({ scenario: "replay", message: "" }) });
 
 /** Formats integer base units (6 decimals) as a USDC amount, without floating point. */
 export function formatUSDC(baseUnits: string | undefined | null): string {
@@ -135,20 +142,19 @@ export function toBaseUnits(usdc: string): string | null {
   return units === "0" ? null : units;
 }
 
-export const LAYER_LABEL: Record<string, string> = {
-  allowlist: "Recipient allowlist",
-  quote_signature: "Quote signature check",
-  spend_limit: "Spend limit",
-  single_use: "Single-use quote",
-  ai_reviewer: "AI reviewer",
-  invoice: "Signed invoice check",
-  vault_policy: "Vault policy",
-};
-
 /** "reviews every payment" or "reviews payments from X USDC". */
 export function reviewScope(threshold: string): string {
   return /^0*1$/.test(threshold) ? "reviews every payment" : `reviews payments from ${formatUSDC(threshold)} USDC`;
 }
+
+export const LAYER_LABEL: Record<string, string> = {
+  allowlist: "Recipient allowlist",
+  spend_limit: "Spend limit",
+  single_use: "Single-use request",
+  ai_reviewer: "AI reviewer",
+  invoice: "Signed invoice check",
+  vault_policy: "Vault policy",
+};
 
 export const shortKey = (s: string, n = 6) => (s.length > n * 2 + 1 ? `${s.slice(0, n)}…${s.slice(-n)}` : s);
 
@@ -199,4 +205,7 @@ export const payInvoice = (id: string, tamper: Tamper) =>
     body: JSON.stringify({ tamper }),
   });
 
-export const DEMO_VENDOR_PAYOUT = "0x7777777777777777777777777777777777777777";
+/** Extracts an invoice id from a pasted pay link ("…/pay/inv_xxx"). */
+export function invoiceIdFromText(text: string): string | null {
+  return text.match(/\/pay\/(inv_[a-z0-9]{10,40})/i)?.[1] ?? null;
+}
