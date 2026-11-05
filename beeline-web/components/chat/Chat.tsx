@@ -7,10 +7,7 @@ import {
   ArrowUp,
   CircleCheck,
   FileWarning,
-  Github,
-  Landmark,
   Menu,
-  MessageSquarePlus,
   MessagesSquare,
   PanelRight,
   Plus,
@@ -23,10 +20,10 @@ import {
 } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { Ledger } from "@/components/Ledger";
+import { SideNav } from "@/components/SideNav";
 import {
   ApiError,
   type PlaygroundState,
-  REPO_URL,
   type RunResult,
   formatUSDC,
   getPlayground,
@@ -146,28 +143,7 @@ export function Chat() {
 
   return (
     <div className={`app-shell ${sideOpen ? "side-open" : ""} ${ledgerOpen ? "ledger-open" : ""}`}>
-      <aside className="side" aria-label="Playground navigation">
-        <div className="side-top">
-          <Link href="/" className="brand" aria-label="Beeline home">
-            <BeeMark size={28} /> Beeline
-          </Link>
-          <button className="icon-btn ghost-btn mobile-only" onClick={() => setSideOpen(false)} aria-label="Close menu">
-            <X size={18} />
-          </button>
-        </div>
-        <button className="side-item active" onClick={() => (setMsgs([]), setSideOpen(false))}>
-          <MessageSquarePlus size={18} aria-hidden /> New chat
-        </button>
-        <Link className="side-item" href="/vendor">
-          <Store size={18} aria-hidden /> Vendor pay links
-        </Link>
-        <a className="side-item" href={state?.vault_url ?? "#"} target="_blank" rel="noreferrer">
-          <Landmark size={18} aria-hidden /> Vault on NearBlocks
-        </a>
-        <a className="side-item" href={REPO_URL} target="_blank" rel="noreferrer">
-          <Github size={18} aria-hidden /> Source code
-        </a>
-
+      <SideNav active="chat" state={state} onClose={() => setSideOpen(false)} onNewChat={() => (setMsgs([]), setSideOpen(false))}>
         <div className="side-label">Try a scenario</div>
         <div className="side-list">
           {SCENARIOS.filter((s) => !s.href).map((s) => (
@@ -178,20 +154,7 @@ export function Chat() {
           ))}
         </div>
 
-        <div className="side-foot">
-          <div className="vault-chip">
-            <span className="vc-ic" aria-hidden>
-              <BeeMark size={22} />
-            </span>
-            <div>
-              <b>{state ? `${formatUSDC(state.balances?.pool)} USDC` : "…"}</b>
-              <span>
-                <span className="live-dot" aria-hidden /> vault on NEAR testnet
-              </span>
-            </div>
-          </div>
-        </div>
-      </aside>
+      </SideNav>
 
       <section className="main">
         <div className="main-top">

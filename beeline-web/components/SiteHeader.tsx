@@ -8,7 +8,7 @@ import { REPO_URL } from "@/lib/api";
 /** Top navigation for the website. The Playground has its own sidebar, so it hides this. */
 export function SiteHeader() {
   const path = usePathname();
-  if (path?.startsWith("/playground")) return null;
+  if (path?.startsWith("/playground") || path?.startsWith("/monitor")) return null;
   return (
     <header className="wrap nav">
       <Link href="/" className="brand" aria-label="Beeline home">
