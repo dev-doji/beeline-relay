@@ -40,7 +40,8 @@ The script pauses before every step. In step 1 a browser window opens and **you*
 | Step | What happens | Expected |
 |---|---|---|
 | 1 | Connect your testnet account to the CLI | Browser approval |
-| 2 | Create `vault.yourname.testnet` with 4 test NEAR | Success |
+| 2 | Create `vault.yourname.testnet` with 4 test NEAR (skipped if it already exists, so the script can be rerun) | Success |
+| 2b | Top the vault up with 2 test NEAR if it holds less than 5.5 (the ~335 KB contract locks about 3.4 NEAR of storage) | Success |
 | 3 | Download the CI-built contract | Success |
 | 4 | Create the agent key and test signer (saved in `beeline-api/.testnet/`, which git ignores) | Prints two public keys |
 | 5 | Deploy and initialize the vault | Success |

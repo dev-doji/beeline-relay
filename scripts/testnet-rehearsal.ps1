@@ -85,9 +85,33 @@ if (-not $SkipImport) {
   Ensure 'Connecting your account'
 }
 
-Step 2 "Create the vault account $Vault with 4 test NEAR from $Owner"
-& near account create-account fund-myself $Vault '4 NEAR' autogenerate-new-keypair save-to-keychain sign-as $Owner @Net sign-with-keychain send
-Ensure "Creating $Vault (if it already exists from an earlier run, use a new -Owner account)"
+# The account's balance in whole NEAR on testnet, or -1 if it does not exist.
+function Get-NearBalance($account) {
+  $body = @{ jsonrpc = '2.0'; id = 1; method = 'query'; params = @{ request_type = 'view_account'; finality = 'final'; account_id = $account } } | ConvertTo-Json -Compress
+  try {
+    $r = Invoke-RestMethod -Method Post -Uri 'https://rpc.testnet.fastnear.com' -ContentType 'application/json' -Body $body
+    if ($null -eq $r.result) { return -1 }
+    return [double]([decimal]$r.result.amount / [decimal]1e24)
+  } catch { return -1 }
+}
+function Test-Account($account) { return (Get-NearBalance $account) -ge 0 }
+
+if (Test-Account $Vault) {
+  Write-Host ''
+  Write-Host "=== Step 2: $Vault already exists, skipping account creation ===" -ForegroundColor Cyan
+} else {
+  Step 2 "Create the vault account $Vault with 4 test NEAR from $Owner"
+  & near account create-account fund-myself $Vault '4 NEAR' autogenerate-new-keypair save-to-keychain sign-as $Owner @Net sign-with-keychain send
+  Ensure "Creating $Vault"
+}
+
+# The contract (~335 KB) locks about 3.4 NEAR of storage, so keep at least 5.5 NEAR in the vault.
+$vaultNear = Get-NearBalance $Vault
+if ($vaultNear -lt 5.5) {
+  Step '2b' "Top up $Vault with 2 test NEAR from $Owner (it has $([math]::Round($vaultNear, 2)) NEAR; the contract needs ~3.4 NEAR of storage)"
+  & near tokens $Owner send-near $Vault '2 NEAR' @Net sign-with-keychain send
+  Ensure "Topping up $Vault"
+}
 
 Step 3 'Download the contract built by CI (agent_vault.wasm) from GitHub'
 $wasmDir = Join-Path $Work 'wasm'
