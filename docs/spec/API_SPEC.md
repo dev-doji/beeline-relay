@@ -229,6 +229,14 @@ Returns the vault's live state, read from NEAR testnet views (`get_config`, `get
 
 It runs one agent attempt and returns `{scenario, outcome: paid|blocked|error, reason, layer, tx_hash, explorer_url, steps[], started_at, duration_ms}`. Steps are `quote` (label `simulated`: a TESTNET-SIMULATED quote, signed by the vault's test signer or, for `forged`, a throwaway key), `review` (label `real`: a NEAR AI Cloud review when the vault's reviewer threshold applies, with the signature verified against the vault's registered key), and `vault` (label `real`: the `pay_quote` testnet transaction). `layer` names the guardrail behind a block: `allowlist`, `quote_signature`, `spend_limit`, `single_use`, `ai_reviewer` or `vault_policy`. Validation errors return `400 VALIDATION_ERROR`, and the rate limit returns `429 RATE_LIMITED`.
 
+### Vendor invoices (playground)
+
+- `POST /playground/invoices` with `{vendor_name, vendor_handle, payout, memo, items: [{name, quantity, unit_price}]}`. Amounts are base units, and the total is computed server-side and capped at 5 test USDC. It returns the invoice, including `payload` (the exact signed JSON) and `signature` (hex ed25519 by the TESTNET invoice issuer). Status `201`.
+- `GET /playground/invoices/{id}` returns the invoice, with `status: open|paid`, `paid_tx` and `paid_at`.
+- `POST /playground/invoices/{id}/pay` with `{tamper: "none" | "swap_payout" | "edit_amount"}` has the agent pay through the vault. Tamper modes simulate a scammer's edited link. It returns `{invoice, run}`, where `run` is a playground run result (layer `invoice` when the signed-invoice check blocks). The invoice is marked paid only after the vault accepted and sent a genuine one.
+
+Both run endpoints share the playground rate limit.
+
 ## Error envelope
 
 ```json

@@ -41,6 +41,7 @@ Every refusal is a failed NEAR transaction with a `BEELINE_VAULT_REJECTED: <reas
 | Two payment rails in the vault: `ORIGIN_CHAIN` (token sent to the 1Click deposit account) and `INTENTS` (`ft_transfer_call` into the NEAR Intents verifier on behalf of the deposit address; refunds land in the vault's Intents balance and `withdraw_from_intents` pulls them back) | ✅ Implemented and unit-tested. A **real** 1Click `INTENTS` quote fetched on 2026-11-05 verifies in Go and on-chain code. Since 2026-11-05, 1Click quotes NEAR-origin payments only on the `INTENTS` rail ([docs/NEAR_INTENTS_ROUTE.md](docs/NEAR_INTENTS_ROUTE.md) section 6b), and the API now requests that rail for USDC NEAR → Base. |
 | Live mainnet payment (USDC NEAR → USDC Base) | ❌ Not done yet. One small payment will confirm that 1Click picks up an on-behalf-of verifier deposit. |
 | **Playground** (`beeline-web` + `GET/POST /api/v1/playground`): chat with Bee, an AI payment agent, ask it to pay or try to trick it, and get rich cards back (quote receipt, AI reviewer verdict, vault guardrail checklist, transaction link) | ✅ Runs locally against `vault.goni-beeline.testnet` with the **NEAR AI reviewer registered on-chain**. A live prompt injection was refused by NEAR AI, and the vault verified that signed refusal on-chain ([Dq4sPfqf…](https://testnet.nearblocks.io/txns/Dq4sPfqfoFMgAvhn4kxmG2MQgbgBSSgEMi2nunxkopsi)). An honest invoice was paid with a signed approval verified on-chain ([5mJkFbge…](https://testnet.nearblocks.io/txns/5mJkFbgeLLFGf7Cww5vJPCiRtpwzM4Qkyi6pYXwZuB3z)). Replay and attacker address were also blocked. ❌ Not deployed publicly yet. |
+| **Vendor pay links** (`/vendor`, `/pay/[id]`): a vendor creates a signed invoice and shares a link or QR code; the buyer's agent pays it through the vault; edited copies (swapped payout, inflated amount) and second payments are refused on-chain | ✅ Contract (6 tests: `contracts/agent-vault/src/invoice.rs`), API (`internal/invoices`, `/api/v1/playground/invoices*`, migration 0003) and pages built. Invoice creation verified locally. ⏳ Live testnet payments need `scripts/vendor-setup.ps1` (vault upgrade plus invoice issuer). |
 | Reconciliation, evidence export | ⏳ Planned |
 | MCP server and demo swarm agents | ⏳ Planned |
 
@@ -53,7 +54,7 @@ Requirements: Go 1.27+, Rust (stable), and Node 22+ with pnpm 9 for the website.
 ```bash
 git clone https://github.com/dev-doji/beeline-relay && cd beeline-relay
 
-# Vault contract: policy, attack, escrow and AI-reviewer tests, including 2 real NEAR AI signatures and 2 real 1Click quotes (63 tests)
+# Vault contract: policy, attack, escrow, invoice and AI-reviewer tests, including 2 real NEAR AI signatures and 2 real 1Click quotes (70 tests)
 cd contracts/agent-vault && cargo test && cd ../..
 
 # API and NEAR AI client tests. Database integration tests skip unless TEST_DATABASE_URL is set.
@@ -83,7 +84,7 @@ beeline-api/             Go API (chi, PostgreSQL, slog)
   internal/payment       idempotent payments, state machine, events
   internal/near          minimal NEAR RPC client that signs FunctionCall transactions (borsh, ed25519)
   internal/playground    public testnet demo: TEST-signed quote, real NEAR AI review, real pay_quote transaction
-scripts/                 testnet-rehearsal.ps1, playground-setup.ps1
+scripts/                 testnet-rehearsal.ps1, playground-setup.ps1, vendor-setup.ps1
 docs/                    plan, provider research, testnet guide, handoff notes
 AGENTS.md                rules for coding agents working in this repo
 ```

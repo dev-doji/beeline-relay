@@ -49,6 +49,16 @@ Allowlists can't catch a payment to an *allowed* recipient for the *wrong reason
 
 **Limitation:** the vault doesn't verify NEAR AI's TEE attestation itself (Intel TDX and NVIDIA evidence). Before calling `set_reviewer`, the owner verifies the attestation report off-chain and checks that its ed25519 `signing_address` equals the key being registered. Instances of the same model share one signing key. The unit tests use a test key and NEAR AI's documented format, and `src/testdata/go_review.json` (a review built by the Go client in `beeline-api/internal/nearai`) must pass the same check. **Live:** `src/testdata/live_review_approve.json` and `live_review_reject.json` are real NEAR AI reviews by `z-ai/glm-5.3-flash`, captured on 2026-11-05. The second one refuses a prompt-injected payment. Both are verified with the real model key `5a0210f2…caff` by the same code the vault runs. `go run ./cmd/review-check` (in `beeline-api`) also checks that this key is bound with a fresh nonce in the model's Intel TDX quote. It doesn't verify Intel's or NVIDIA's certificate chains.
 
+## Signed vendor invoices (pay links)
+
+The allowlist is right for a few known payees, but not for thousands of vendors. So the owner can also register an **invoice issuer** key with `set_invoice_issuer(hex)`. Then `pay_quote(quote_json, review, job_id, invoice)` may pay a vendor who is *not* on the allowlist, if `invoice = {payload, signature}` is an invoice that key signed (ed25519 over the exact payload bytes) and:
+
+- the quote's recipient, amount and destination asset equal the invoice's `payout`, `amount` and `asset`;
+- the invoice hasn't expired (`expires_at`, in Unix seconds);
+- the invoice hasn't been paid (each `id` can be paid once; a failed transfer releases it).
+
+A scammer who edits a copied link (a new payout address or a bigger amount) breaks the signature, and the vault refuses with `invoice was not signed by the trusted invoice issuer`. Every other guardrail (quote signature, limits, single-use deposit, AI reviewer) still applies. The issuer key and paid marks live under raw storage keys, so adding the feature needed no state migration. Views: `get_invoice_issuer`, `is_invoice_paid`. Events: `invoice_payment`, `invoice_released`, `invoice_issuer_set`.
+
 ## Swarm job escrow
 
 A hirer (the job's **funder**) escrows a budget for one job, and a swarm of agents is paid from it:
@@ -84,7 +94,7 @@ Events use NEP-297 (`EVENT_JSON:`, standard `beeline-agent-vault`): `payment_req
 ## Build and test
 
 ```bash
-cargo test                                   # 63 unit tests
+cargo test                                   # 70 unit tests
 cargo near build non-reproducible-wasm       # optimized wasm for deployment
 ```
 
