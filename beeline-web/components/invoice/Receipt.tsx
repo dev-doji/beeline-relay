@@ -73,8 +73,8 @@ export function Receipt({ data }: { data: ReceiptData }) {
         </b>
       </div>
       <div className="payto">
-        <span>Pays out on Base</span>
-        <code>{data.payout ? shortKey(data.payout, 6) : "0x…"}</code>
+        <span>Pays out to (NEAR testnet)</span>
+        <code>{data.payout ? shortKey(data.payout, 12) : "—"}</code>
       </div>
       {data.signed && (
         <div className="sigline">

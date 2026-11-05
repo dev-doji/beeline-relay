@@ -13,7 +13,7 @@ export function SideNav({
   onNewChat,
   children,
 }: {
-  active: "chat" | "monitor";
+  active: "chat" | "monitor" | "vendor";
   state: PlaygroundState | null;
   onClose: () => void;
   onNewChat?: () => void;
@@ -41,7 +41,7 @@ export function SideNav({
           <MessagesSquare size={18} aria-hidden /> Chat with Bee
         </Link>
       )}
-      <Link className="side-item" href="/vendor">
+      <Link className={`side-item ${active === "vendor" ? "active" : ""}`} href="/vendor">
         <Store size={18} aria-hidden /> Vendor pay links
       </Link>
       <a className="side-item" href={state?.vault_url ?? "#"} target="_blank" rel="noreferrer">

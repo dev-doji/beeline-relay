@@ -5,6 +5,7 @@ import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { ArrowRight, Check, Copy, ExternalLink, MessageCircle, Plus, Store, Trash2 } from "lucide-react";
 import { Receipt, lineTotal } from "@/components/invoice/Receipt";
+import { AppFrame } from "@/components/AppFrame";
 import { ApiError, type Invoice, type InvoiceItem, createInvoice, getPlayground, toBaseUnits } from "@/lib/api";
 
 interface DraftItem {
@@ -84,7 +85,8 @@ export default function VendorPage() {
   }
 
   return (
-    <div className="wrap">
+    <AppFrame active="vendor" title="Vendor pay links" icon={<Store size={16} aria-hidden />}>
+    <div className="frame-inner">
       <div className="page-head">
         <span className="pill pill-honey">
           <Store size={13} aria-hidden /> Vendor demo · NEAR testnet
@@ -222,5 +224,6 @@ export default function VendorPage() {
         </div>
       </div>
     </div>
+    </AppFrame>
   );
 }

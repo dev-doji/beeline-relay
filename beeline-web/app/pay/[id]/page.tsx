@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Bot, Coins, FlaskConical, Repeat, Replace, Store } from "lucide-react";
 import { Receipt } from "@/components/invoice/Receipt";
+import { AppFrame } from "@/components/AppFrame";
 import { BotFrame, Thinking, Typewriter } from "@/components/chat/Chat";
 import { Outcome, PlanCard, ReviewCard, VaultCard } from "@/components/chat/cards";
 import {
@@ -33,6 +34,14 @@ const TAMPERS: { id: Tamper; label: string; short: string; icon: React.ReactNode
 ];
 
 export default function PayPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <AppFrame active="vendor" title="Pay link" icon={<Store size={16} aria-hidden />}>
+      <PayContent params={params} />
+    </AppFrame>
+  );
+}
+
+function PayContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [state, setState] = useState<PlaygroundState | null>(null);
