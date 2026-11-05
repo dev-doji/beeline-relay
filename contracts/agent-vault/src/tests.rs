@@ -1303,3 +1303,30 @@ fn intents_admin_is_owner_only() {
     v.set_intents_contract("intents.testnet".parse().unwrap());
     assert_eq!(v.get_config().intents_contract.as_str(), "intents.testnet");
 }
+
+#[test]
+fn owner_can_raise_an_agents_gas_allowance_without_widening_its_key() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    assert!(rejection(|| {
+        let _ = v.set_agent_allowance(agent_key(1), U128(1));
+    })
+    .contains("owner only"));
+    as_owner(T0);
+    let three_near = NearToken::from_near(3).as_yoctonear();
+    let _ = v.set_agent_allowance(agent_key(1), U128(three_near));
+    let r = format!("{:?}", near_sdk::test_utils::get_created_receipts());
+    assert!(
+        r.contains("DeleteKey") && r.contains("AddKeyWithFunctionCall"),
+        "{r}"
+    );
+    assert!(r.contains(&three_near.to_string()), "{r}");
+    assert!(rejection(|| {
+        let _ = v.set_agent_allowance(agent_key(1), U128(NearToken::from_near(11).as_yoctonear()));
+    })
+    .contains("between 1 yoctoNEAR and 10 NEAR"));
+    assert!(rejection(|| {
+        let _ = v.set_agent_allowance(agent_key(7), U128(1));
+    })
+    .contains("unknown or inactive agent"));
+}

@@ -17,6 +17,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/playground"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
 )
 
@@ -47,6 +48,9 @@ type Deps struct {
 	Payments          *payment.Service
 	Environment       string
 	RouteVerification RouteVerification
+	// Playground is the public testnet demo; nil disables its endpoints.
+	Playground        *playground.Service
+	PlaygroundLimiter *RunLimiter
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -72,6 +76,8 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/capabilities", h.capabilities)
 		r.Get("/networks", h.networks)
 		r.Get("/assets", h.assets)
+		r.Get("/playground", h.playgroundState)
+		r.Post("/playground/runs", h.playgroundRun)
 
 		r.Group(func(r chi.Router) {
 			r.Use(requireAuth(d.Auth, d.Logger))

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,7 +21,10 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/config"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/httpapi"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/near"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/nearai"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/playground"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/storage"
 )
@@ -57,17 +62,36 @@ func run() error {
 		log.Info("migrations applied")
 	}
 
+	pgCfg, err := playground.FromEnv(os.LookupEnv)
+	if err != nil {
+		return fmt.Errorf("playground config: %w", err)
+	}
+	var pg *playground.Service
+	if pgCfg != nil {
+		pg = &playground.Service{
+			Cfg:   *pgCfg,
+			Chain: near.NewClient(envOr("NEAR_RPC_URL", "https://rpc.testnet.fastnear.com"), 60*time.Second),
+			Now:   time.Now,
+		}
+		if key := os.Getenv("NEAR_AI_API_KEY"); key != "" {
+			pg.Reviewer = nearai.NewClient(os.Getenv("NEAR_AI_API_BASE_URL"), key, 120*time.Second)
+		}
+		log.Info("playground enabled", "vault", pgCfg.Vault, "live_reviews", pg.Reviewer != nil)
+	}
+
 	cat := catalog.Default()
 	provider := intents.NewClient(cfg.IntentsBaseURL, cfg.IntentsAPIKey, 15*time.Second)
 	router := httpapi.NewRouter(httpapi.Deps{
-		Logger:         log,
-		DB:             pool,
-		AllowedOrigins: cfg.CORSAllowedOrigins,
-		Auth:           &auth.Store{DB: pool},
-		Catalog:        cat,
-		Quotes:         &quote.Service{DB: pool, Provider: provider, Catalog: cat, Now: time.Now},
-		Payments:       &payment.Service{DB: pool, Now: time.Now},
-		Environment:    "mainnet",
+		Logger:            log,
+		DB:                pool,
+		AllowedOrigins:    cfg.CORSAllowedOrigins,
+		Auth:              &auth.Store{DB: pool},
+		Catalog:           cat,
+		Quotes:            &quote.Service{DB: pool, Provider: provider, Catalog: cat, Now: time.Now},
+		Payments:          &payment.Service{DB: pool, Now: time.Now},
+		Environment:       "mainnet",
+		Playground:        pg,
+		PlaygroundLimiter: NewLimiterFromEnv(),
 		RouteVerification: httpapi.RouteVerification{
 			Status: "not_verified",
 			Notes:  "No end-to-end payment has been run on this deployment yet. See docs/NEAR_INTENTS_ROUTE.md.",
@@ -79,7 +103,7 @@ func run() error {
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      180 * time.Second, // playground runs wait for a NEAR AI review and a testnet transaction
 		IdleTimeout:       60 * time.Second,
 	}
 
@@ -102,4 +126,24 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+func envOr(k, def string) string {
+	if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+		return v
+	}
+	return def
+}
+
+// NewLimiterFromEnv caps public playground runs: PLAYGROUND_RUNS_PER_MINUTE per client
+// (default 4) and PLAYGROUND_RUNS_PER_DAY in total (default 300).
+func NewLimiterFromEnv() *httpapi.RunLimiter {
+	perMin, perDay := 4, 300
+	if v, err := strconv.Atoi(os.Getenv("PLAYGROUND_RUNS_PER_MINUTE")); err == nil && v > 0 {
+		perMin = v
+	}
+	if v, err := strconv.Atoi(os.Getenv("PLAYGROUND_RUNS_PER_DAY")); err == nil && v > 0 {
+		perDay = v
+	}
+	return httpapi.NewRunLimiter(perMin, time.Minute, perDay)
 }

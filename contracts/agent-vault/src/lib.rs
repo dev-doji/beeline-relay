@@ -659,6 +659,34 @@ impl AgentVault {
         Promise::new(env::current_account_id()).delete_key(public_key)
     }
 
+    /// Re-issues an active agent's function-call key with a new gas allowance (in yoctoNEAR,
+    /// at most 10 NEAR). The key can still only call `pay_quote`; the allowance caps how much
+    /// of the vault's NEAR the agent can burn on gas.
+    pub fn set_agent_allowance(&mut self, public_key: PublicKey, allowance: U128) -> Promise {
+        self.assert_owner();
+        require!(
+            matches!(self.agents.get(&public_key), Some(a) if a.active),
+            "BEELINE_VAULT_REJECTED: unknown or inactive agent"
+        );
+        let allowance = NearToken::from_yoctonear(allowance.0);
+        require!(
+            !allowance.is_zero() && allowance <= NearToken::from_near(10),
+            "allowance must be between 1 yoctoNEAR and 10 NEAR"
+        );
+        emit(
+            "agent_allowance_set",
+            near_sdk::serde_json::json!({ "public_key": public_key, "allowance": U128(allowance.as_yoctonear()) }),
+        );
+        Promise::new(env::current_account_id())
+            .delete_key(public_key.clone())
+            .add_access_key_allowance(
+                public_key,
+                Allowance::limited(allowance).expect("non-zero allowance"),
+                env::current_account_id(),
+                "pay_quote".to_string(),
+            )
+    }
+
     pub fn set_limits(&mut self, max_per_payment: U128, daily_limit_per_agent: U128) {
         self.assert_owner();
         require!(

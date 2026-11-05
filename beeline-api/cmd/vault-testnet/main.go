@@ -13,29 +13,31 @@
 package main
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/mr-tron/base58"
 
-	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/nearai"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/testnetquote"
 )
 
 const (
-	dir           = ".testnet"
-	signerFile    = "test-quote-signer.json"
-	agentFile     = "agent-key.json"
-	testToken     = "usdc.fakes.testnet"
-	destAsset     = "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near"
-	correlationID = "TESTNET-SIMULATED-QUOTE"
+	dir        = ".testnet"
+	signerFile = "test-quote-signer.json"
+	agentFile  = "agent-key.json"
+	testToken  = "usdc.fakes.testnet"
+	destAsset  = "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near"
 )
 
 // keyFile matches the near CLI access-key file format.
@@ -55,6 +57,8 @@ func main() {
 		err = keys(os.Args[2:])
 	case "quote":
 		err = quote(os.Args[2:])
+	case "reviewer-args":
+		err = reviewerArgs(os.Args[2:])
 	default:
 		usage()
 	}
@@ -65,7 +69,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: vault-testnet keys -vault <account> | quote -vault <account> -recipient <0x…> -amount <base units> -name <label> [-forged]")
+	fmt.Fprintln(os.Stderr, "usage: vault-testnet keys -vault <account> | quote -vault <account> -recipient <0x…> -amount <base units> -name <label> [-forged] | reviewer-args [-model m] [-threshold n]")
 	os.Exit(2)
 }
 
@@ -152,41 +156,55 @@ func quote(args []string) error {
 	}
 
 	// A fresh implicit account plays the role of 1Click's deposit address.
-	var dep [32]byte
-	_, _ = rand.Read(dep[:])
-	now := time.Now().UTC()
-	resp := map[string]any{
-		"correlationId": correlationID,
-		"timestamp":     now.Format("2006-01-02T15:04:05.000Z"),
-		"signature":     "",
-		"quoteRequest": map[string]any{
-			"dry": false, "swapType": "EXACT_INPUT", "slippageTolerance": 100,
-			"originAsset": "nep141:" + testToken, "depositType": "ORIGIN_CHAIN",
-			"destinationAsset": destAsset, "amount": *amount,
-			"refundTo": *vault, "refundType": "ORIGIN_CHAIN",
-			"recipient": *recipient, "recipientType": "DESTINATION_CHAIN",
-			"deadline": now.Add(10 * time.Minute).Format("2006-01-02T15:04:05.000Z"),
-		},
-		"quote": map[string]any{
-			"amountIn": *amount, "minAmountIn": *amount, "amountOut": *amount, "minAmountOut": *amount,
-			"depositAddress": hex.EncodeToString(dep[:]),
-			"deadline":       now.Add(24 * time.Hour).Format("2006-01-02T15:04:05.000Z"),
-			"timeEstimate":   22,
-		},
-	}
-	unsigned, _ := json.Marshal(resp)
-	hash, err := intents.QuoteHash(unsigned)
+	q, err := testnetquote.Build(ed25519.PrivateKey(priv), testnetquote.Params{
+		Vault: *vault, Token: testToken, DestinationAsset: destAsset,
+		Recipient: *recipient, Amount: *amount, Now: time.Now(),
+	})
 	if err != nil {
 		return err
 	}
-	resp["signature"] = "ed25519:" + base58.Encode(ed25519.Sign(ed25519.PrivateKey(priv), []byte(hash)))
-	quoteJSON, _ := json.Marshal(resp)
-
 	out := fmt.Sprintf("pay-%s.json", *name)
-	if err := writeJSON(out, map[string]string{"quote_json": string(quoteJSON)}); err != nil {
+	if err := writeJSON(out, map[string]string{"quote_json": q.JSON}); err != nil {
 		return err
 	}
 	fmt.Printf("wrote %s (deposit account %s, recipient %s, amount %s, forged=%v)\n",
-		filepath.Join(dir, out), resp["quote"].(map[string]any)["depositAddress"], *recipient, *amount, *forged)
+		filepath.Join(dir, out), q.DepositAddress, *recipient, *amount, *forged)
 	return nil
+}
+
+// reviewerArgs checks the NEAR AI model's attestation live (the reviewer key must be bound in
+// its Intel TDX quote with a fresh nonce) and writes .testnet/set-reviewer.json for set_reviewer.
+func reviewerArgs(args []string) error {
+	fs := flag.NewFlagSet("reviewer-args", flag.ExitOnError)
+	model := fs.String("model", envOr("NEAR_AI_REVIEW_MODEL", "z-ai/glm-5.3-flash"), "NEAR AI Cloud model (TEE-hosted)")
+	threshold := fs.String("threshold", "1", "payments of at least this many base units need a review")
+	_ = fs.Parse(args)
+	_ = godotenv.Load()
+	key := strings.TrimSpace(os.Getenv("NEAR_AI_API_KEY"))
+	if key == "" {
+		return errors.New("NEAR_AI_API_KEY is not set in beeline-api/.env")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	att, err := nearai.NewClient(os.Getenv("NEAR_AI_API_BASE_URL"), key, time.Minute).CheckAttestation(ctx, *model, "")
+	if err != nil {
+		return fmt.Errorf("attestation check failed: %w", err)
+	}
+	out := map[string]string{
+		"model": *model, "signing_key": att.SigningAddress,
+		"policy_prompt_sha256": nearai.PolicySHA256(), "threshold": *threshold,
+	}
+	if err := writeJSON("set-reviewer.json", out); err != nil {
+		return err
+	}
+	fmt.Printf("attested key %s for %s (TDX report_data binds it with nonce %s…)\nwrote %s\n",
+		att.SigningAddress, *model, att.Nonce[:12], filepath.Join(dir, "set-reviewer.json"))
+	return nil
+}
+
+func envOr(k, def string) string {
+	if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+		return v
+	}
+	return def
 }
