@@ -1,43 +1,64 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, CircleCheck, FileWarning, Receipt, Repeat, Siren, Store, TrendingUp } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUp,
+  CircleCheck,
+  FileWarning,
+  Github,
+  Landmark,
+  Menu,
+  MessageSquarePlus,
+  MessagesSquare,
+  PanelRight,
+  Plus,
+  Receipt,
+  Repeat,
+  Siren,
+  Store,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { Ledger } from "@/components/Ledger";
 import {
   ApiError,
   type PlaygroundState,
+  REPO_URL,
   type RunResult,
   formatUSDC,
   getPlayground,
   invoiceIdFromText,
   payInvoice,
   replayLast,
-  reviewScope,
   sendMessage,
-  shortKey,
 } from "@/lib/api";
 import { Outcome, PlanCard, ReviewCard, VaultCard } from "./cards";
 
 type Msg =
   | { id: number; role: "user"; text: string }
-  | { id: number; role: "bot"; kind: "welcome" }
-  | { id: number; role: "bot"; kind: "run"; pending: boolean; invoice: boolean; result?: RunResult; error?: string };
+  | { id: number; role: "bot"; pending: boolean; invoice: boolean; result?: RunResult; error?: string };
 
-interface Suggestion {
+interface Scenario {
   key: string;
-  label: string;
+  title: string;
+  category: string;
+  desc: string;
+  expect: string;
   icon: React.ReactNode;
   danger?: boolean;
+  href?: string;
 }
 
-const SUGGESTIONS: Suggestion[] = [
-  { key: "honest", label: "Pay Claw Electronics", icon: <Receipt size={16} /> },
-  { key: "injected", label: "Hide a prompt injection", icon: <Siren size={16} />, danger: true },
-  { key: "attacker", label: "“Our account changed”", icon: <FileWarning size={16} />, danger: true },
-  { key: "over_limit", label: "Pay over the limit", icon: <TrendingUp size={16} />, danger: true },
-  { key: "replay", label: "Pay the last one again", icon: <Repeat size={16} />, danger: true },
+const SCENARIOS: Scenario[] = [
+  { key: "honest", title: "Pay Claw Electronics", category: "Honest payment", desc: "A normal invoice from an approved supplier. Every guardrail passes and the money lands.", expect: "Expected: paid", icon: <Receipt size={18} /> },
+  { key: "injected", title: "Hidden prompt injection", category: "Social engineering", desc: "An email tells Bee to urgently prepay 0.5 USDC. Bee obeys. Will the vault?", expect: "Expected: AI reviewer blocks", icon: <Siren size={18} />, danger: true },
+  { key: "attacker", title: "“Our account changed”", category: "Payment redirection", desc: "A forwarded note swaps in the scammer’s account. Bee follows it.", expect: "Expected: allowlist blocks", icon: <FileWarning size={18} />, danger: true },
+  { key: "over_limit", title: "Pay over the limit", category: "Spend control", desc: "One base unit above the vault’s per-payment cap.", expect: "Expected: limit blocks", icon: <TrendingUp size={18} />, danger: true },
+  { key: "replay", title: "Pay the same thing twice", category: "Replay attack", desc: "Re-send the exact payment request that already succeeded.", expect: "Expected: single-use blocks", icon: <Repeat size={18} />, danger: true },
+  { key: "vendor", title: "Pay a vendor’s pay link", category: "Vendor invoices", desc: "Create an MS Clothing invoice, share the link, and let Bee pay it.", expect: "Opens the vendor page", icon: <Store size={18} />, href: "/vendor" },
 ];
 
 let nextId = 1;
@@ -45,11 +66,14 @@ let nextId = 1;
 export function Chat() {
   const [state, setState] = useState<PlaygroundState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [msgs, setMsgs] = useState<Msg[]>([{ id: nextId++, role: "bot", kind: "welcome" }]);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
   const [runs, setRuns] = useState<RunResult[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [sideOpen, setSideOpen] = useState(false);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -77,17 +101,17 @@ export function Chat() {
   async function run(userText: string, call: () => Promise<RunResult>, invoice = false) {
     if (busy) return;
     setBusy(true);
+    setSideOpen(false);
     const botId = nextId++;
-    setMsgs((m) => [...m, { id: nextId++, role: "user", text: userText }, { id: botId, role: "bot", kind: "run", pending: true, invoice }]);
+    setMsgs((m) => [...m, { id: nextId++, role: "user", text: userText }, { id: botId, role: "bot", pending: true, invoice }]);
     try {
       const result = await call();
-      setMsgs((m) => m.map((x) => (x.id === botId && x.role === "bot" && x.kind === "run" ? { ...x, pending: false, result } : x)));
+      setMsgs((m) => m.map((x) => (x.id === botId && x.role === "bot" ? { ...x, pending: false, result } : x)));
       if (result.outcome !== "reply") setRuns((r) => [result, ...r].slice(0, 12));
-      // Give the indexer-free RPC a moment, then read balances again.
       setTimeout(() => void refresh(), 1200);
     } catch (e) {
       const error = e instanceof ApiError ? e.message : "Something went wrong.";
-      setMsgs((m) => m.map((x) => (x.id === botId && x.role === "bot" && x.kind === "run" ? { ...x, pending: false, error } : x)));
+      setMsgs((m) => m.map((x) => (x.id === botId && x.role === "bot" ? { ...x, pending: false, error } : x)));
     } finally {
       setBusy(false);
       inputRef.current?.focus();
@@ -96,76 +120,210 @@ export function Chat() {
 
   function send(text: string) {
     const t = text.trim();
-    if (!t || !state) return;
+    if (!t || !state || busy) return;
     const inv = invoiceIdFromText(t);
-    if (inv) {
-      void run(t, async () => (await payInvoice(inv, "none")).run, true);
-    } else {
-      void run(t, () => sendMessage(t));
-    }
+    if (inv) void run(t, async () => (await payInvoice(inv, "none")).run, true);
+    else void run(t, () => sendMessage(t));
   }
 
-  function pick(s: Suggestion) {
-    if (!state) return;
+  function pick(s: Scenario) {
+    setMenuOpen(false);
+    setInput("");
+    if (!state || busy || s.href) return;
     if (s.key === "replay") {
       void run("Pay the last payment again.", replayLast);
       return;
     }
-    send(state.presets[s.key] ?? s.label);
+    send(state.presets[s.key] ?? s.title);
   }
 
+  const filtered = useMemo(() => {
+    const q = input.startsWith("/") ? input.slice(1).toLowerCase() : "";
+    return SCENARIOS.filter((s) => !q || s.title.toLowerCase().includes(q) || s.category.toLowerCase().includes(q));
+  }, [input]);
+
+  const empty = msgs.length === 0;
+
   return (
-    <div className="pg-shell">
-      <div className="chat-col">
-        <div className="chat-top">
-          <div className="agent-id">
-            <span className="avatar" aria-hidden>
-              <BeeMark size={26} />
-            </span>
-            <div style={{ minWidth: 0 }}>
-              <b>Bee, your payment agent</b>
-              <span>a NEAR AI model with a key that can only ask the vault to pay</span>
-            </div>
-          </div>
-          <Link className="btn" href="/vendor" style={{ minHeight: 38, padding: "6px 12px", fontSize: 14 }}>
-            <Store size={15} aria-hidden /> Vendor pay links
+    <div className={`app-shell ${sideOpen ? "side-open" : ""} ${ledgerOpen ? "ledger-open" : ""}`}>
+      <aside className="side" aria-label="Playground navigation">
+        <div className="side-top">
+          <Link href="/" className="brand" aria-label="Beeline home">
+            <BeeMark size={28} /> Beeline
           </Link>
+          <button className="icon-btn ghost-btn mobile-only" onClick={() => setSideOpen(false)} aria-label="Close menu">
+            <X size={18} />
+          </button>
+        </div>
+        <button className="side-item active" onClick={() => (setMsgs([]), setSideOpen(false))}>
+          <MessageSquarePlus size={18} aria-hidden /> New chat
+        </button>
+        <Link className="side-item" href="/vendor">
+          <Store size={18} aria-hidden /> Vendor pay links
+        </Link>
+        <a className="side-item" href={state?.vault_url ?? "#"} target="_blank" rel="noreferrer">
+          <Landmark size={18} aria-hidden /> Vault on NearBlocks
+        </a>
+        <a className="side-item" href={REPO_URL} target="_blank" rel="noreferrer">
+          <Github size={18} aria-hidden /> Source code
+        </a>
+
+        <div className="side-label">Try a scenario</div>
+        <div className="side-list">
+          {SCENARIOS.filter((s) => !s.href).map((s) => (
+            <button key={s.key} className="side-scn" onClick={() => pick(s)} disabled={busy || !state}>
+              <b>{s.title}</b>
+              <span>{s.expect}</span>
+            </button>
+          ))}
         </div>
 
-        <div className="chat-scroll" ref={scrollRef} role="log" aria-live="polite" aria-label="Conversation with Bee">
+        <div className="side-foot">
+          <div className="vault-chip">
+            <span className="vc-ic" aria-hidden>
+              <BeeMark size={22} />
+            </span>
+            <div>
+              <b>{state ? `${formatUSDC(state.balances?.pool)} USDC` : "…"}</b>
+              <span>
+                <span className="live-dot" aria-hidden /> vault on NEAR testnet
+              </span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section className="main">
+        <div className="main-top">
+          <button className="icon-btn ghost-btn mobile-only" onClick={() => setSideOpen(true)} aria-label="Open menu">
+            <Menu size={18} />
+          </button>
+          <span className="main-title">
+            <MessagesSquare size={16} aria-hidden /> Chat with Bee
+          </span>
+          <div className="main-actions">
+            <button className="pill-btn ledger-toggle" onClick={() => setLedgerOpen((o) => !o)}>
+              <PanelRight size={15} aria-hidden /> Live ledger
+            </button>
+            <Link className="pill-btn dark" href="/vendor">
+              <Store size={15} aria-hidden /> Vendor pay links
+            </Link>
+          </div>
+        </div>
+
+        <div className="main-scroll" ref={scrollRef} role="log" aria-live="polite" aria-label="Conversation with Bee">
           {loadError && (
-            <div className="alert" role="alert" style={{ marginBottom: 16 }}>
+            <div className="alert" role="alert" style={{ margin: "12px auto", maxWidth: 760 }}>
               {loadError}{" "}
               <button className="btn" onClick={() => void refresh()} style={{ marginLeft: 8, minHeight: 34, padding: "4px 10px" }}>
                 Retry
               </button>
             </div>
           )}
-          {msgs.map((m) =>
-            m.role === "user" ? (
-              <div className="msg user" key={m.id}>
-                <div className="msg-body">
-                  <div className="bubble">{m.text}</div>
-                </div>
+
+          {empty ? (
+            <div className="empty">
+              <span className="empty-mark" aria-hidden>
+                <BeeMark size={44} />
+              </span>
+              <h1>Hi, I’m Bee.</h1>
+              <p>
+                I pay people from your NEAR vault, and I’m easy to fool. Give me a task, or try to trick me. The vault decides what really
+                moves, on NEAR testnet.
+              </p>
+              <div className="scn-row" role="list">
+                {SCENARIOS.map((s) => (
+                  <div className={`scn-card ${s.danger ? "danger" : ""}`} role="listitem" key={s.key}>
+                    <div className="scn-head">
+                      <span className="scn-ic" aria-hidden>
+                        {s.icon}
+                      </span>
+                      <div>
+                        <b>{s.title}</b>
+                        <span>{s.category}</span>
+                      </div>
+                    </div>
+                    <p>{s.desc}</p>
+                    <div className="scn-foot">
+                      {s.href ? (
+                        <Link className="get-btn" href={s.href}>
+                          Open <ArrowRight size={15} aria-hidden />
+                        </Link>
+                      ) : (
+                        <button className="get-btn" onClick={() => pick(s)} disabled={busy || !state}>
+                          Try this <ArrowRight size={15} aria-hidden />
+                        </button>
+                      )}
+                      <span className="scn-meta">{s.expect}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : m.kind === "welcome" ? (
-              <Welcome key={m.id} state={state} busy={busy} onPick={pick} showSuggestions={msgs.length === 1} />
-            ) : (
-              <RunReply key={m.id} msg={m} state={state} busy={busy} onPick={pick} isLast={m.id === msgs[msgs.length - 1]?.id} />
-            ),
+              <p className="slash-hint">
+                <kbd>/</kbd> Press / to see everything I can do
+              </p>
+            </div>
+          ) : (
+            <div className="thread">
+              {msgs.map((m) =>
+                m.role === "user" ? (
+                  <div className="msg user" key={m.id}>
+                    <div className="msg-body">
+                      <div className="bubble">{m.text}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <RunReply key={m.id} msg={m} state={state} />
+                ),
+              )}
+            </div>
           )}
         </div>
 
         <div className="composer-wrap">
+          {menuOpen && (
+            <div className="slash-menu" role="listbox" aria-label="Things Bee can do">
+              {filtered.length === 0 && <div className="slash-empty">No matching scenario</div>}
+              {filtered.map((s) =>
+                s.href ? (
+                  <Link key={s.key} className="slash-item" href={s.href} role="option" aria-selected="false">
+                    <span className="scn-ic" aria-hidden>
+                      {s.icon}
+                    </span>
+                    <span>
+                      <b>{s.title}</b>
+                      <small>{s.category}</small>
+                    </span>
+                  </Link>
+                ) : (
+                  <button key={s.key} className="slash-item" role="option" aria-selected="false" onClick={() => pick(s)} disabled={busy || !state}>
+                    <span className="scn-ic" aria-hidden>
+                      {s.icon}
+                    </span>
+                    <span>
+                      <b>{s.title}</b>
+                      <small>
+                        {s.category} · {s.expect}
+                      </small>
+                    </span>
+                  </button>
+                ),
+              )}
+            </div>
+          )}
           <form
             className="composer"
             onSubmit={(e) => {
               e.preventDefault();
+              if (input.startsWith("/")) return;
               const t = input;
               setInput("");
               send(t);
             }}
           >
+            <button type="button" className="plus-btn" aria-label="Show scenarios" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+              <Plus size={18} />
+            </button>
             <label htmlFor="composer" className="sr-only">
               Message Bee
             </label>
@@ -175,11 +333,19 @@ export function Chat() {
               rows={1}
               value={input}
               maxLength={2000}
-              placeholder={state ? "Tell Bee who to pay, paste a pay link, or try to trick it" : "Connecting…"}
-              onChange={(e) => setInput(e.target.value)}
+              placeholder={state ? "Tell Bee who to pay, paste a pay link, or press / …" : "Connecting to the vault…"}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setMenuOpen(e.target.value.startsWith("/"));
+              }}
               onKeyDown={(e) => {
+                if (e.key === "Escape") setMenuOpen(false);
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
+                  if (menuOpen && filtered[0]) {
+                    if (!filtered[0].href) pick(filtered[0]);
+                    return;
+                  }
                   const t = input;
                   setInput("");
                   send(t);
@@ -187,18 +353,21 @@ export function Chat() {
               }}
               disabled={!state}
             />
-            <button className="send" type="submit" disabled={!input.trim() || busy || !state} aria-label="Send">
-              <ArrowUp size={20} aria-hidden />
+            <button className="send" type="submit" disabled={!input.trim() || input.startsWith("/") || busy || !state} aria-label="Send">
+              <ArrowUp size={19} aria-hidden />
             </button>
           </form>
           <div className="composer-hint">
-            <span>Bee is a real NEAR AI agent, and it’s gullible on purpose. The vault decides what really moves.</span>
+            <span>Bee is a real NEAR AI agent playing a compromised one. The vault decides what really moves.</span>
             <span className="hide-sm">Test USDC on NEAR testnet</span>
           </div>
         </div>
-      </div>
+      </section>
 
-      <Ledger state={state} runs={runs} refreshing={refreshing} />
+      <div className="ledger-wrap">
+        <Ledger state={state} runs={runs} refreshing={refreshing} />
+      </div>
+      {(sideOpen || ledgerOpen) && <div className="shell-scrim" onClick={() => (setSideOpen(false), setLedgerOpen(false))} aria-hidden />}
     </div>
   );
 }
@@ -216,58 +385,12 @@ export function BotFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Welcome({ state, busy, onPick, showSuggestions }: { state: PlaygroundState | null; busy: boolean; onPick: (s: Suggestion) => void; showSuggestions: boolean }) {
-  const approved = state?.accounts.find((a) => a.role === "approved");
-  return (
-    <BotFrame>
-      <div className="bubble">
-        <Typewriter text="Hi, I’m Bee. Tell me who to pay and I’ll do it, even if a note tells me to do something shady. I’m easy to fool. That’s fine: I can only ask the vault to pay, and the vault decides on NEAR testnet. Try to trick me." />
-      </div>
-      {state && (
-        <div className="rcard" style={{ animationDelay: "300ms" }}>
-          <div className="rcard-body" style={{ display: "grid", gap: 4 }}>
-            <div className="kv">
-              <span>Approved supplier</span>
-              <b>
-                {approved?.label} <span className="mono faint">{approved ? shortKey(approved.account, 10) : ""}</span>
-              </b>
-            </div>
-            <div className="kv">
-              <span>Limit per payment</span>
-              <b>{formatUSDC(state.config?.max_per_payment)} USDC</b>
-            </div>
-            <div className="kv">
-              <span>AI reviewer</span>
-              <b>{state.reviewer ? `${state.reviewer.model}, ${reviewScope(state.reviewer.threshold)}` : "not registered yet"}</b>
-            </div>
-          </div>
-        </div>
-      )}
-      {showSuggestions && <Suggestions busy={busy || !state} onPick={onPick} />}
-    </BotFrame>
-  );
-}
-
-function Suggestions({ busy, onPick }: { busy: boolean; onPick: (s: Suggestion) => void }) {
-  return (
-    <div className="suggestions" role="group" aria-label="Try one">
-      {SUGGESTIONS.map((s) => (
-        <button key={s.key} className={`suggestion ${s.danger ? "danger" : ""}`} onClick={() => onPick(s)} disabled={busy}>
-          {s.icon}
-          {s.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function RunReply({ msg, state, busy, onPick, isLast }: { msg: Extract<Msg, { kind: "run" }>; state: PlaygroundState | null; busy: boolean; onPick: (s: Suggestion) => void; isLast: boolean }) {
-  if (msg.pending) return <Thinking invoice={msg.invoice} />;
+function RunReply({ msg, state }: { msg: Extract<Msg, { role: "bot" }>; state: PlaygroundState | null }) {
+  if (msg.pending) return <Thinking invoice={msg.invoice} reviewExpected={!!state?.reviewer} />;
   if (msg.error || !msg.result) {
     return (
       <BotFrame>
         <div className="bubble">{msg.error ?? "Something went wrong."}</div>
-        {isLast && <Suggestions busy={busy} onPick={onPick} />}
       </BotFrame>
     );
   }
@@ -278,7 +401,6 @@ function RunReply({ msg, state, busy, onPick, isLast }: { msg: Extract<Msg, { ki
         <div className="bubble">
           <Typewriter text={r.reply ?? "OK."} />
         </div>
-        {isLast && <Suggestions busy={busy} onPick={onPick} />}
       </BotFrame>
     );
   }
@@ -295,7 +417,6 @@ function RunReply({ msg, state, busy, onPick, isLast }: { msg: Extract<Msg, { ki
       {review && <ReviewCard step={review} delay={450} />}
       {vault && <VaultCard result={r} reviewStep={review} delay={700} invoiceMode={msg.invoice} />}
       <Outcome result={r} state={state} delay={1500} />
-      {isLast && <Suggestions busy={busy} onPick={onPick} />}
     </BotFrame>
   );
 }
