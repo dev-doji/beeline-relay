@@ -69,6 +69,14 @@ func FromEnv(lookup func(string) (string, bool)) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("PLAYGROUND_QUOTE_SIGNER_KEY: %w", err)
 	}
+	issuerSecret, err := readKey("PLAYGROUND_INVOICE_ISSUER_KEY", "invoice-issuer.json")
+	if err != nil {
+		return nil, err
+	}
+	issuer, err := near.ParseKey("invoice-issuer", issuerSecret)
+	if err != nil {
+		return nil, fmt.Errorf("PLAYGROUND_INVOICE_ISSUER_KEY: %w", err)
+	}
 	return &Config{
 		Network:          "testnet",
 		Vault:            vault,
@@ -81,6 +89,7 @@ func FromEnv(lookup func(string) (string, bool)) (*Config, error) {
 		ExplorerAcctURL:  "https://testnet.nearblocks.io/address/",
 		AgentKey:         agent,
 		QuoteSigner:      ed25519.PrivateKey(signer.Private),
+		InvoiceIssuer:    ed25519.PrivateKey(issuer.Private),
 	}, nil
 }
 

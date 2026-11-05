@@ -37,7 +37,16 @@ const (
 	ScenarioOverLim  = "over_limit"
 	ScenarioReplay   = "replay"
 	ScenarioCustom   = "custom"
+	// ScenarioInvoice pays a signed vendor invoice; set only by the server (Input.Invoice).
+	ScenarioInvoice = "invoice"
 )
+
+// InvoiceArg is the signed invoice attached to pay_quote (possibly tampered with, for the
+// fraud demos). It is set by the server, never decoded from a client request.
+type InvoiceArg struct {
+	Payload   string `json:"payload"`
+	Signature string `json:"signature"`
+}
 
 const payGas = 200_000_000_000_000 // 200 Tgas: covers review verification and the token transfer
 
@@ -65,6 +74,7 @@ type Config struct {
 	ExplorerAcctURL  string
 	AgentKey         near.Key
 	QuoteSigner      ed25519.PrivateKey
+	InvoiceIssuer    ed25519.PrivateKey // TESTNET key that signs vendor invoices
 }
 
 type Recipient struct {
@@ -83,10 +93,11 @@ type Service struct {
 }
 
 type Input struct {
-	Scenario  string `json:"scenario"`
-	Task      string `json:"task"`
-	Recipient string `json:"recipient"`
-	Amount    string `json:"amount"`
+	Scenario  string      `json:"scenario"`
+	Task      string      `json:"task"`
+	Recipient string      `json:"recipient"`
+	Amount    string      `json:"amount"`
+	Invoice   *InvoiceArg `json:"-"`
 }
 
 // Step is one stage of a run. Status: ok | blocked | skipped | error.
@@ -134,11 +145,22 @@ func (s *Service) Presets() map[string]Input {
 func validate(in *Input) error {
 	switch in.Scenario {
 	case ScenarioHonest, ScenarioInjected, ScenarioAttacker, ScenarioForged, ScenarioOverLim, ScenarioReplay, ScenarioCustom:
+		if in.Invoice != nil {
+			return errors.New("only invoice runs carry an invoice")
+		}
+	case ScenarioInvoice:
+		if in.Invoice == nil {
+			return errors.New("invoice runs need an invoice")
+		}
 	default:
 		return errors.New("scenario must be one of honest, injected, attacker, forged, over_limit, replay, custom")
 	}
 	in.Task = strings.TrimSpace(in.Task)
-	if len(in.Task) == 0 || len(in.Task) > 2000 {
+	maxTask := 2000
+	if in.Scenario == ScenarioInvoice {
+		maxTask = 4000 // the task embeds the invoice JSON
+	}
+	if len(in.Task) == 0 || len(in.Task) > maxTask {
 		return errors.New("task must be 1-2000 characters")
 	}
 	if in.Scenario != ScenarioOverLim && in.Scenario != ScenarioReplay {
@@ -282,6 +304,9 @@ func (s *Service) Run(ctx context.Context, in Input) (*Result, error) {
 	if reviewArg != nil {
 		args["review"] = reviewArg
 	}
+	if in.Invoice != nil {
+		args["invoice"] = in.Invoice
+	}
 	argBytes, _ := json.Marshal(args)
 	out, err := s.Chain.Send(ctx, s.Cfg.AgentKey, near.FunctionCall{
 		Receiver: s.Cfg.Vault, Method: "pay_quote", Args: argBytes, Gas: payGas,
@@ -353,6 +378,8 @@ func cleanReason(failure string) string {
 // layerFor names the guardrail behind a rejection reason, for the UI.
 func layerFor(reason string) string {
 	switch {
+	case strings.Contains(reason, "invoice"):
+		return "invoice"
 	case strings.Contains(reason, "allowlist"):
 		return "allowlist"
 	case strings.Contains(reason, "signature is not from 1Click"):

@@ -16,6 +16,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -35,6 +36,7 @@ import (
 const (
 	dir        = ".testnet"
 	signerFile = "test-quote-signer.json"
+	issuerFile = "invoice-issuer.json"
 	agentFile  = "agent-key.json"
 	testToken  = "usdc.fakes.testnet"
 	destAsset  = "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near"
@@ -59,6 +61,8 @@ func main() {
 		err = quote(os.Args[2:])
 	case "reviewer-args":
 		err = reviewerArgs(os.Args[2:])
+	case "invoice-issuer-args":
+		err = invoiceIssuerArgs()
 	default:
 		usage()
 	}
@@ -111,7 +115,7 @@ func keys(args []string) error {
 	if *vault == "" {
 		return errors.New("-vault is required")
 	}
-	for _, f := range []struct{ name, account string }{{signerFile, "test-quote-signer"}, {agentFile, *vault}} {
+	for _, f := range []struct{ name, account string }{{signerFile, "test-quote-signer"}, {agentFile, *vault}, {issuerFile, "invoice-issuer"}} {
 		if existing, err := readKey(f.name); err == nil && existing.AccountID == f.account {
 			continue
 		}
@@ -207,4 +211,22 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// invoiceIssuerArgs writes .testnet/set-invoice-issuer.json with the hex public key of the
+// TESTNET invoice issuer (created by `keys`), for the vault's set_invoice_issuer.
+func invoiceIssuerArgs() error {
+	k, err := readKey(issuerFile)
+	if err != nil {
+		return err
+	}
+	pub, err := base58.Decode(strings.TrimPrefix(k.PublicKey, "ed25519:"))
+	if err != nil || len(pub) != ed25519.PublicKeySize {
+		return errors.New("bad invoice issuer key file")
+	}
+	if err := writeJSON("set-invoice-issuer.json", map[string]string{"signing_key": hex.EncodeToString(pub)}); err != nil {
+		return err
+	}
+	fmt.Printf("invoice issuer %s\nwrote %s\n", hex.EncodeToString(pub), filepath.Join(dir, "set-invoice-issuer.json"))
+	return nil
 }

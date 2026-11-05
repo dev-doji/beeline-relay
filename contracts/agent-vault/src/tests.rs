@@ -200,7 +200,7 @@ fn rejection<F: FnOnce()>(f: F) -> String {
 
 fn assert_rejected(v: &mut AgentVault, json: String, needle: &str) {
     let msg = rejection(|| {
-        let _ = v.pay_quote(json, None, None);
+        let _ = v.pay_quote(json, None, None, None);
     });
     assert!(
         msg.contains(needle),
@@ -212,7 +212,7 @@ fn assert_rejected(v: &mut AgentVault, json: String, needle: &str) {
 fn pays_valid_quote_and_records_spend() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None, None);
 
     let (_, agent) = v.get_agents().into_iter().next().unwrap();
     assert_eq!(agent.spent_today, U128(1_000_000));
@@ -295,7 +295,7 @@ fn enforces_per_payment_limit() {
 fn enforces_daily_budget_and_resets_next_day() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None, None, None);
 
     let mut second = Q::new(4_000_000, DEPOSIT_2);
     second.issued = T0 + 2 * MIN;
@@ -307,7 +307,7 @@ fn enforces_daily_budget_and_resets_next_day() {
     second.issued = next_day;
     second.deadline = next_day + 60 * MIN;
     as_agent(1, next_day + MIN);
-    let _ = v.pay_quote(second.signed(), None, None);
+    let _ = v.pay_quote(second.signed(), None, None, None);
     let (_, agent) = v.get_agents().into_iter().next().unwrap();
     assert_eq!(agent.spent_today, U128(4_000_000));
     assert_eq!(agent.total_spent, U128(9_000_000));
@@ -319,9 +319,9 @@ fn budgets_are_per_agent() {
     as_owner(T0);
     let _ = v.add_agent(agent_key(2), "second-agent".into());
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_1).signed(), None, None, None);
     as_agent(2, T0 + MIN);
-    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_2).signed(), None, None);
+    let _ = v.pay_quote(Q::new(5_000_000, DEPOSIT_2).signed(), None, None, None);
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn deposit_address_can_only_be_paid_once() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
     let json = Q::new(1_000_000, DEPOSIT_1).signed();
-    let _ = v.pay_quote(json.clone(), None, None);
+    let _ = v.pay_quote(json.clone(), None, None, None);
     assert_rejected(&mut v, json, "already been paid");
 }
 
@@ -437,7 +437,7 @@ fn paused_vault_pays_nothing() {
 fn failed_transfer_restores_budget_and_deposit() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None, None);
 
     testing_env!(
         context(VAULT, agent_key(1), T0 + MIN).build(),
@@ -463,7 +463,7 @@ fn failed_transfer_restores_budget_and_deposit() {
 fn successful_transfer_keeps_bookkeeping() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None, None);
     testing_env!(
         context(VAULT, agent_key(1), T0 + MIN).build(),
         near_sdk::test_vm_config(),
@@ -575,7 +575,7 @@ fn setup_reviewed() -> AgentVault {
 
 fn assert_review_rejected(v: &mut AgentVault, json: String, review: Review, needle: &str) {
     let msg = rejection(|| {
-        let _ = v.pay_quote(json, Some(review), None);
+        let _ = v.pay_quote(json, Some(review), None, None);
     });
     assert!(
         msg.contains(needle),
@@ -587,7 +587,7 @@ fn assert_review_rejected(v: &mut AgentVault, json: String, review: Review, need
 fn small_payments_skip_review() {
     let mut v = setup_reviewed();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None, None);
     assert!(v.is_deposit_used(DEPOSIT_1.into()));
 }
 
@@ -607,7 +607,7 @@ fn approved_review_pays_and_is_logged() {
     let mut v = setup_reviewed();
     as_agent(1, T0 + MIN);
     let json = Q::new(3_000_000, DEPOSIT_1).signed();
-    let _ = v.pay_quote(json.clone(), Some(R::approving(&json).build()), None);
+    let _ = v.pay_quote(json.clone(), Some(R::approving(&json).build()), None, None);
     assert!(v.is_deposit_used(DEPOSIT_1.into()));
     assert!(get_logs()
         .iter()
@@ -755,13 +755,18 @@ fn setup_job() -> AgentVault {
 
 fn pay_job(v: &mut AgentVault, seed: u8, amount: u128, deposit: &str) {
     as_agent(seed, T0 + MIN);
-    let _ = v.pay_quote(Q::new(amount, deposit).signed(), None, Some(JOB.into()));
+    let _ = v.pay_quote(
+        Q::new(amount, deposit).signed(),
+        None,
+        Some(JOB.into()),
+        None,
+    );
 }
 
 fn assert_job_rejected(v: &mut AgentVault, seed: u8, q: Q, needle: &str) {
     as_agent(seed, T0 + MIN);
     let msg = rejection(|| {
-        let _ = v.pay_quote(q.signed(), None, Some(JOB.into()));
+        let _ = v.pay_quote(q.signed(), None, Some(JOB.into()), None);
     });
     assert!(
         msg.contains(needle),
@@ -870,7 +875,7 @@ fn job_recipients_narrow_the_allowlist() {
     assert_job_rejected(&mut v, 1, attacker, "is not on the allowlist");
     // The same recipient is fine for an ordinary pool payment.
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(q.signed(), None, None);
+    let _ = v.pay_quote(q.signed(), None, None, None);
     assert!(v.is_deposit_used(DEPOSIT_1.into()));
 }
 
@@ -1020,7 +1025,7 @@ fn expired_job_pays_nothing_and_anyone_can_close_it() {
     q.deadline = later + 60 * MIN;
     as_agent(1, later + MIN);
     let msg = rejection(|| {
-        let _ = v.pay_quote(q.signed(), None, Some(JOB.into()));
+        let _ = v.pay_quote(q.signed(), None, Some(JOB.into()), None);
     });
     assert!(msg.contains("has expired"), "{msg}");
 
@@ -1089,7 +1094,7 @@ fn sync_does_not_count_a_transfer_that_completed_after_the_read() {
     let read = U128(POOL);
     // ...then a 1 USDC payment starts and completes before the sync callback runs.
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::new(1_000_000, DEPOSIT_1).signed(), None, None, None);
     callback_env(PromiseResult::Successful(vec![]));
     v.on_transfer_complete(
         agent_key(1),
@@ -1157,7 +1162,7 @@ fn used_result(used: u128) -> PromiseResult {
 fn intents_quote_is_paid_with_ft_transfer_call_to_the_verifier() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None, None);
     assert!(v.is_deposit_used(DEPOSIT_1.into()));
     let r = receipts_debug();
     assert!(r.contains("ft_transfer_call"), "{r}");
@@ -1218,7 +1223,7 @@ fn intents_rail_keeps_every_other_guardrail() {
 fn full_intents_deposit_counts_as_paid() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None, None);
     callback_env(used_result(1_000_000));
     assert!(v.on_intents_deposit_complete(
         agent_key(1),
@@ -1236,7 +1241,7 @@ fn refused_intents_deposit_restores_everything() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
     let pool_before = v.get_balances().pool;
-    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None, None);
     // The verifier rejected the deposit: the token contract refunded it all (used = 0).
     callback_env(used_result(0));
     assert!(!v.on_intents_deposit_complete(
@@ -1252,7 +1257,7 @@ fn refused_intents_deposit_restores_everything() {
     assert_eq!(agent.spent_today, U128(0));
     // A failed call (no result at all) is treated the same way.
     as_agent(1, T0 + MIN);
-    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None, None);
     callback_env(PromiseResult::Failed);
     assert!(!v.on_intents_deposit_complete(
         agent_key(1),
@@ -1269,7 +1274,7 @@ fn partial_intents_deposit_returns_the_rest() {
     let mut v = setup();
     as_agent(1, T0 + MIN);
     let pool_before = v.get_balances().pool.0;
-    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None);
+    let _ = v.pay_quote(Q::intents(1_000_000, DEPOSIT_1).signed(), None, None, None);
     callback_env(used_result(400_000));
     assert!(v.on_intents_deposit_complete(
         agent_key(1),
@@ -1329,4 +1334,204 @@ fn owner_can_raise_an_agents_gas_allowance_without_widening_its_key() {
         let _ = v.set_agent_allowance(agent_key(7), U128(1));
     })
     .contains("unknown or inactive agent"));
+}
+
+// --- Signed vendor invoices (pay links) --------------------------------------------------
+
+const VENDOR: &str = "0x7777777777777777777777777777777777777777"; // not on the allowlist
+const INV_EXPIRES: u64 = T0 / NS_PER_SEC + 3600;
+
+fn invoice_issuer() -> SigningKey {
+    SigningKey::from_bytes(&[11u8; 32])
+}
+
+fn invoice_payload(id: &str, payout: &str, amount: u128, expires: u64) -> String {
+    near_sdk::serde_json::json!({
+        "v": 1, "id": id, "vendor": "Ada Fabrics", "payout": payout, "asset": DEST_ASSET,
+        "amount": amount.to_string(), "expires_at": expires, "memo": "30 ankara dresses"
+    })
+    .to_string()
+}
+
+fn signed_invoice(payload: String, key: &SigningKey) -> Invoice {
+    let signature = review::to_hex(&key.sign(payload.as_bytes()).to_bytes());
+    Invoice { payload, signature }
+}
+
+fn vendor_quote(recipient: &str, amount: u128, deposit: &str) -> String {
+    let mut q = Q::new(amount, deposit);
+    q.recipient = recipient.into();
+    q.signed()
+}
+
+fn setup_invoices() -> AgentVault {
+    let mut v = setup();
+    as_owner(T0);
+    v.set_invoice_issuer(Some(review::to_hex(
+        invoice_issuer().verifying_key().as_bytes(),
+    )));
+    v
+}
+
+fn pay_invoice(v: &mut AgentVault, quote: String, inv: Invoice) -> String {
+    rejection(|| {
+        let _ = v.pay_quote(quote, None, None, Some(inv));
+    })
+}
+
+#[test]
+fn signed_invoice_pays_a_vendor_who_is_not_on_the_allowlist() {
+    let mut v = setup_invoices();
+    as_agent(1, T0 + MIN);
+    let inv = signed_invoice(
+        invoice_payload("inv_1", VENDOR, 500_000, INV_EXPIRES),
+        &invoice_issuer(),
+    );
+    assert_eq!(
+        pay_invoice(&mut v, vendor_quote(VENDOR, 500_000, DEPOSIT_1), inv),
+        ""
+    );
+    assert!(v.is_invoice_paid("inv_1".into()));
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("invoice_payment") && l.contains("inv_1")));
+    // Without an invoice, the same vendor is still refused.
+    let msg = rejection(|| {
+        let _ = v.pay_quote(vendor_quote(VENDOR, 500_000, DEPOSIT_2), None, None, None);
+    });
+    assert!(msg.contains("not on the allowlist"), "{msg}");
+}
+
+#[test]
+fn edited_or_fake_invoices_are_rejected() {
+    let mut v = setup_invoices();
+    as_agent(1, T0 + MIN);
+    // A scammer copies a real invoice and swaps the payout address, keeping the signature.
+    let real = signed_invoice(
+        invoice_payload("inv_1", VENDOR, 500_000, INV_EXPIRES),
+        &invoice_issuer(),
+    );
+    let edited = Invoice {
+        payload: real.payload.replace(VENDOR, ATTACKER),
+        signature: real.signature.clone(),
+    };
+    let msg = pay_invoice(&mut v, vendor_quote(ATTACKER, 500_000, DEPOSIT_1), edited);
+    assert!(
+        msg.contains("not signed by the trusted invoice issuer"),
+        "{msg}"
+    );
+    // Or bumps the amount.
+    let bumped = Invoice {
+        payload: real.payload.replace("500000", "5000000"),
+        signature: real.signature,
+    };
+    let msg = pay_invoice(&mut v, vendor_quote(VENDOR, 5_000_000, DEPOSIT_1), bumped);
+    assert!(
+        msg.contains("not signed by the trusted invoice issuer"),
+        "{msg}"
+    );
+    // Or signs a whole invoice with their own key.
+    let fake = signed_invoice(
+        invoice_payload("inv_x", ATTACKER, 500_000, INV_EXPIRES),
+        &SigningKey::from_bytes(&[66u8; 32]),
+    );
+    let msg = pay_invoice(&mut v, vendor_quote(ATTACKER, 500_000, DEPOSIT_1), fake);
+    assert!(
+        msg.contains("not signed by the trusted invoice issuer"),
+        "{msg}"
+    );
+    assert!(!v.is_deposit_used(DEPOSIT_1.into()));
+}
+
+#[test]
+fn quote_must_match_the_invoice_terms() {
+    let mut v = setup_invoices();
+    as_agent(1, T0 + MIN);
+    let inv = || {
+        signed_invoice(
+            invoice_payload("inv_1", VENDOR, 500_000, INV_EXPIRES),
+            &invoice_issuer(),
+        )
+    };
+    // A genuine invoice attached to a quote that pays someone else.
+    let msg = pay_invoice(&mut v, vendor_quote(ATTACKER, 500_000, DEPOSIT_1), inv());
+    assert!(msg.contains("invoice inv_1 pays"), "{msg}");
+    let msg = pay_invoice(&mut v, vendor_quote(VENDOR, 400_000, DEPOSIT_1), inv());
+    assert!(msg.contains("does not match invoice inv_1 amount"), "{msg}");
+}
+
+#[test]
+fn invoice_can_be_paid_once_and_expires() {
+    let mut v = setup_invoices();
+    as_agent(1, T0 + MIN);
+    let inv = || {
+        signed_invoice(
+            invoice_payload("inv_1", VENDOR, 500_000, INV_EXPIRES),
+            &invoice_issuer(),
+        )
+    };
+    assert_eq!(
+        pay_invoice(&mut v, vendor_quote(VENDOR, 500_000, DEPOSIT_1), inv()),
+        ""
+    );
+    // A fresh quote (new deposit address) for the same invoice: still refused.
+    let msg = pay_invoice(&mut v, vendor_quote(VENDOR, 500_000, DEPOSIT_2), inv());
+    assert!(msg.contains("inv_1 has already been paid"), "{msg}");
+
+    let expired = signed_invoice(
+        invoice_payload("inv_2", VENDOR, 500_000, T0 / NS_PER_SEC - 1),
+        &invoice_issuer(),
+    );
+    let msg = pay_invoice(&mut v, vendor_quote(VENDOR, 500_000, DEPOSIT_2), expired);
+    assert!(msg.contains("inv_2 has expired"), "{msg}");
+}
+
+#[test]
+fn failed_transfer_releases_the_invoice() {
+    let mut v = setup_invoices();
+    as_agent(1, T0 + MIN);
+    let inv = || {
+        signed_invoice(
+            invoice_payload("inv_1", VENDOR, 500_000, INV_EXPIRES),
+            &invoice_issuer(),
+        )
+    };
+    assert_eq!(
+        pay_invoice(&mut v, vendor_quote(VENDOR, 500_000, DEPOSIT_1), inv()),
+        ""
+    );
+    callback_env(PromiseResult::Failed);
+    assert!(!v.on_transfer_complete(
+        agent_key(1),
+        DEPOSIT_1.into(),
+        U128(500_000),
+        T0 / NS_PER_DAY,
+        None
+    ));
+    assert!(!v.is_invoice_paid("inv_1".into()));
+    as_agent(1, T0 + MIN);
+    assert_eq!(
+        pay_invoice(&mut v, vendor_quote(VENDOR, 500_000, DEPOSIT_2), inv()),
+        ""
+    );
+}
+
+#[test]
+fn invoices_need_a_registered_issuer_set_by_the_owner() {
+    let mut v = setup();
+    as_agent(1, T0 + MIN);
+    let inv = signed_invoice(
+        invoice_payload("inv_1", VENDOR, 500_000, INV_EXPIRES),
+        &invoice_issuer(),
+    );
+    let msg = pay_invoice(&mut v, vendor_quote(VENDOR, 500_000, DEPOSIT_1), inv);
+    assert!(msg.contains("accepts no invoices"), "{msg}");
+    assert!(
+        rejection(|| v.set_invoice_issuer(Some(review::to_hex(&[1u8; 32])))).contains("owner only")
+    );
+    as_owner(T0);
+    v.set_invoice_issuer(Some(review::to_hex(&[1u8; 32])));
+    assert_eq!(v.get_invoice_issuer(), Some(review::to_hex(&[1u8; 32])));
+    v.set_invoice_issuer(None);
+    assert_eq!(v.get_invoice_issuer(), None);
 }

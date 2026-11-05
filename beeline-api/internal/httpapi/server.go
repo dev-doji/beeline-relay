@@ -16,6 +16,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/apperr"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/playground"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
@@ -51,6 +52,7 @@ type Deps struct {
 	// Playground is the public testnet demo; nil disables its endpoints.
 	Playground        *playground.Service
 	PlaygroundLimiter *RunLimiter
+	Invoices          *invoices.Service
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -78,6 +80,9 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/assets", h.assets)
 		r.Get("/playground", h.playgroundState)
 		r.Post("/playground/runs", h.playgroundRun)
+		r.Post("/playground/invoices", h.createInvoice)
+		r.Get("/playground/invoices/{id}", h.getInvoice)
+		r.Post("/playground/invoices/{id}/pay", h.payInvoice)
 
 		r.Group(func(r chi.Router) {
 			r.Use(requireAuth(d.Auth, d.Logger))

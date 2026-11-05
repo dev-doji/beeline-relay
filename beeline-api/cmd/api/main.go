@@ -21,6 +21,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/config"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/httpapi"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/near"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/nearai"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
@@ -67,6 +68,7 @@ func run() error {
 		return fmt.Errorf("playground config: %w", err)
 	}
 	var pg *playground.Service
+	var inv *invoices.Service
 	if pgCfg != nil {
 		pg = &playground.Service{
 			Cfg:   *pgCfg,
@@ -76,7 +78,8 @@ func run() error {
 		if key := os.Getenv("NEAR_AI_API_KEY"); key != "" {
 			pg.Reviewer = nearai.NewClient(os.Getenv("NEAR_AI_API_BASE_URL"), key, 120*time.Second)
 		}
-		log.Info("playground enabled", "vault", pgCfg.Vault, "live_reviews", pg.Reviewer != nil)
+		inv = &invoices.Service{DB: pool, Issuer: pgCfg.InvoiceIssuer, Asset: pgCfg.DestinationAsset, TTL: 7 * 24 * time.Hour, Now: time.Now}
+		log.Info("playground enabled", "vault", pgCfg.Vault, "live_reviews", pg.Reviewer != nil, "invoice_issuer", inv.IssuerPublicKeyHex())
 	}
 
 	cat := catalog.Default()
@@ -92,6 +95,7 @@ func run() error {
 		Environment:       "mainnet",
 		Playground:        pg,
 		PlaygroundLimiter: NewLimiterFromEnv(),
+		Invoices:          inv,
 		RouteVerification: httpapi.RouteVerification{
 			Status: "not_verified",
 			Notes:  "No end-to-end payment has been run on this deployment yet. See docs/NEAR_INTENTS_ROUTE.md.",

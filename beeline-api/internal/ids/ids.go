@@ -24,4 +24,5 @@ const (
 	Quote     = "qte"
 	Payment   = "pay"
 	Event     = "evt"
+	Invoice   = "inv"
 )

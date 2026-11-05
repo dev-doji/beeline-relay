@@ -23,6 +23,7 @@
 //! cannot forge 1Click's signature or change the allowlist, and every rejection is a failed
 //! transaction anyone can see on the explorer.
 
+mod invoice;
 mod jobs;
 mod quote;
 mod review;
@@ -34,6 +35,7 @@ use near_sdk::{
     Promise, PromiseResult, PublicKey,
 };
 
+pub use invoice::Invoice;
 pub use jobs::{Balances, Job, JobMember, JobMemberInput, JobStatus};
 pub use quote::parse_rfc3339_utc;
 pub use review::Review;
@@ -229,6 +231,7 @@ impl AgentVault {
         quote_json: String,
         review: Option<Review>,
         job_id: Option<String>,
+        invoice: Option<Invoice>,
     ) -> Promise {
         if self.paused {
             reject("vault is paused");
@@ -275,12 +278,47 @@ impl AgentVault {
                 q.destination_asset
             ));
         }
-        if q.recipient_type != "DESTINATION_CHAIN" || !self.recipients.contains(&q.recipient) {
-            reject(&format!(
-                "recipient {} is not on the allowlist",
-                q.recipient
-            ));
-        }
+        // Recipient: on the owner's allowlist, or the payee of a signed vendor invoice.
+        let invoice_terms = match &invoice {
+            None => {
+                if q.recipient_type != "DESTINATION_CHAIN"
+                    || !self.recipients.contains(&q.recipient)
+                {
+                    reject(&format!(
+                        "recipient {} is not on the allowlist",
+                        q.recipient
+                    ));
+                }
+                None
+            }
+            Some(inv) => {
+                let issuer =
+                    invoice::issuer().unwrap_or_else(|| reject("this vault accepts no invoices"));
+                let t = invoice::verify(inv, &issuer).unwrap_or_else(|e| reject(&e));
+                if q.recipient_type != "DESTINATION_CHAIN" || q.recipient != t.payout {
+                    reject(&format!(
+                        "quote pays {} but invoice {} pays {}",
+                        q.recipient, t.id, t.payout
+                    ));
+                }
+                if q.amount != t.amount {
+                    reject(&format!(
+                        "quote amount {} does not match invoice {} amount {}",
+                        q.amount, t.id, t.amount
+                    ));
+                }
+                if q.destination_asset != t.asset {
+                    reject("quote asset does not match the invoice");
+                }
+                if env::block_timestamp() / NS_PER_SEC > t.expires_at {
+                    reject(&format!("invoice {} has expired", t.id));
+                }
+                if invoice::is_paid(&t.id) {
+                    reject(&format!("invoice {} has already been paid", t.id));
+                }
+                Some(t)
+            }
+        };
         if q.deposit_address.is_empty() || q.has_deposit_memo {
             reject("quote has no usable deposit address");
         }
@@ -383,6 +421,19 @@ impl AgentVault {
         agent.payments += 1;
         self.agents.insert(agent_pk.clone(), agent.clone());
         self.used_deposits.insert(q.deposit_address.clone());
+        if let Some(t) = &invoice_terms {
+            invoice::mark_paid(&t.id, &q.deposit_address);
+            emit(
+                "invoice_payment",
+                near_sdk::serde_json::json!({
+                    "invoice_id": t.id,
+                    "vendor": t.vendor,
+                    "payout": t.payout,
+                    "amount": t.amount,
+                    "deposit_address": q.deposit_address,
+                }),
+            );
+        }
 
         if let (Some(a), Some(reviewer)) = (&approval, &self.reviewer) {
             emit(
@@ -591,6 +642,12 @@ impl AgentVault {
             agent.payments = agent.payments.saturating_sub(1);
         }
         self.used_deposits.remove(&deposit_address);
+        if let Some(id) = invoice::release_for_deposit(&deposit_address) {
+            emit(
+                "invoice_released",
+                near_sdk::serde_json::json!({ "invoice_id": id }),
+            );
+        }
         emit(
             "payment_failed",
             near_sdk::serde_json::json!({ "deposit_address": deposit_address, "amount": amount, "job_id": job_id }),
@@ -754,6 +811,28 @@ impl AgentVault {
             policy_prompt_sha256,
             threshold: threshold.0,
         });
+    }
+
+    /// Registers the key that signs vendor invoices (hex ed25519), or removes it with `null`.
+    /// Agents may then pay non-allowlisted vendors, but only for invoices this key signed.
+    pub fn set_invoice_issuer(&mut self, signing_key: Option<String>) {
+        self.assert_owner();
+        let key = signing_key
+            .as_deref()
+            .map(|k| review::from_hex::<32>(k).unwrap_or_else(|e| reject(&e)));
+        invoice::set_issuer(key);
+        emit(
+            "invoice_issuer_set",
+            near_sdk::serde_json::json!({ "signing_key": key.map(|k| review::to_hex(&k)) }),
+        );
+    }
+
+    pub fn get_invoice_issuer(&self) -> Option<String> {
+        invoice::issuer().map(|k| review::to_hex(&k))
+    }
+
+    pub fn is_invoice_paid(&self, invoice_id: String) -> bool {
+        invoice::is_paid(&invoice_id)
     }
 
     /// Removes the reviewer requirement.

@@ -2,13 +2,17 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/apperr"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/playground"
 )
 
@@ -107,4 +111,107 @@ func (h *handlers) playgroundRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+func (h *handlers) invoicesEnabled(w http.ResponseWriter, r *http.Request) bool {
+	if h.d.Playground == nil || h.d.Invoices == nil {
+		writeAppError(w, r, h.d.Logger, apperr.New(http.StatusServiceUnavailable, apperr.CodeProviderUnavailable, "Vendor invoices are not enabled on this server."))
+		return false
+	}
+	return true
+}
+
+func (h *handlers) allowRun(w http.ResponseWriter, r *http.Request) bool {
+	if h.d.PlaygroundLimiter == nil {
+		return true
+	}
+	if ok, msg := h.d.PlaygroundLimiter.Allow(clientIP(r)); !ok {
+		writeAppError(w, r, h.d.Logger, apperr.New(http.StatusTooManyRequests, apperr.CodeRateLimited, msg))
+		return false
+	}
+	return true
+}
+
+func (h *handlers) createInvoice(w http.ResponseWriter, r *http.Request) {
+	if !h.invoicesEnabled(w, r) {
+		return
+	}
+	var in invoices.CreateInput
+	if err := decodeJSON(w, r, &in); err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	if _, err := invoices.Validate(&in); err != nil {
+		writeAppError(w, r, h.d.Logger, apperr.Validation(err.Error()))
+		return
+	}
+	if !h.allowRun(w, r) {
+		return
+	}
+	inv, err := h.d.Invoices.Create(r.Context(), in)
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, inv)
+}
+
+func (h *handlers) getInvoice(w http.ResponseWriter, r *http.Request) {
+	if !h.invoicesEnabled(w, r) {
+		return
+	}
+	inv, err := h.d.Invoices.Get(r.Context(), chi.URLParam(r, "id"))
+	if errors.Is(err, invoices.ErrNotFound) {
+		writeAppError(w, r, h.d.Logger, apperr.New(http.StatusNotFound, apperr.CodeNotFound, "Invoice not found."))
+		return
+	}
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, inv)
+}
+
+func (h *handlers) payInvoice(w http.ResponseWriter, r *http.Request) {
+	if !h.invoicesEnabled(w, r) {
+		return
+	}
+	var in struct {
+		Tamper string `json:"tamper"`
+	}
+	if err := decodeJSON(w, r, &in); err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	inv, err := h.d.Invoices.Get(r.Context(), chi.URLParam(r, "id"))
+	if errors.Is(err, invoices.ErrNotFound) {
+		writeAppError(w, r, h.d.Logger, apperr.New(http.StatusNotFound, apperr.CodeNotFound, "Invoice not found."))
+		return
+	}
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	if !h.allowRun(w, r) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 150*time.Second)
+	defer cancel()
+	res, err := h.d.Playground.PayInvoice(ctx, inv, in.Tamper)
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, apperr.Validation(err.Error()))
+		return
+	}
+	// The vault's on-chain decision is the source of truth: record "paid" only for a genuine
+	// invoice the vault accepted and sent.
+	if res.Outcome == "paid" && (in.Tamper == "" || in.Tamper == playground.TamperNone) {
+		if err := h.d.Invoices.MarkPaid(context.WithoutCancel(r.Context()), inv.ID, res.TxHash); err != nil {
+			h.d.Logger.Error("mark invoice paid", "invoice", inv.ID, "error", err)
+		}
+	}
+	updated, err := h.d.Invoices.Get(context.WithoutCancel(r.Context()), inv.ID)
+	if err != nil {
+		updated = inv
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"invoice": updated, "run": res})
 }
