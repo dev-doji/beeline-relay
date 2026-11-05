@@ -1757,3 +1757,21 @@ fn failed_direct_transfer_restores_everything() {
     assert_eq!(v.get_balances().pool.0, pool);
     assert!(!v.is_deposit_used("direct:nonce_0301".into()));
 }
+
+#[test]
+fn agent_keys_may_call_only_the_two_payment_methods() {
+    let mut v = setup();
+    as_owner(T0);
+    let _ = v.add_agent(agent_key(5), "second".into());
+    let r = format!("{:?}", near_sdk::test_utils::get_created_receipts());
+    assert!(
+        r.contains(r#"method_names: ["pay_quote", "pay_direct"]"#),
+        "{r}"
+    );
+    let _ = v.set_agent_allowance(agent_key(5), U128(NearToken::from_near(1).as_yoctonear()));
+    let r = format!("{:?}", near_sdk::test_utils::get_created_receipts());
+    assert!(
+        r.contains(r#"method_names: ["pay_quote", "pay_direct"]"#),
+        "{r}"
+    );
+}

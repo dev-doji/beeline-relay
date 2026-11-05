@@ -56,6 +56,8 @@ const GAS_INTENTS_WITHDRAW: Gas = Gas::from_tgas(60);
 const DEFAULT_INTENTS_CONTRACT: &str = "intents.near";
 /// Gas-fee allowance granted to each agent key (it pays for the agent's transactions only).
 const AGENT_KEY_ALLOWANCE: NearToken = NearToken::from_millinear(250);
+/// The only methods an agent key may call (comma-separated, as NEAR access keys require).
+const AGENT_METHODS: &str = "pay_quote,pay_direct";
 
 #[near(serializers = [borsh])]
 #[derive(BorshStorageKey)]
@@ -698,7 +700,7 @@ impl AgentVault {
             public_key,
             Allowance::limited(AGENT_KEY_ALLOWANCE).expect("non-zero allowance"),
             env::current_account_id(),
-            "pay_quote".to_string(),
+            AGENT_METHODS.to_string(),
         )
     }
 
@@ -741,7 +743,7 @@ impl AgentVault {
                 public_key,
                 Allowance::limited(allowance).expect("non-zero allowance"),
                 env::current_account_id(),
-                "pay_quote".to_string(),
+                AGENT_METHODS.to_string(),
             )
     }
 

@@ -11,6 +11,7 @@
          scammer.<owner>           the attacker (never approved)
     3. Approve claw-electronics.<owner> on the vault's allowlist.
     4. Register the TESTNET invoice issuer key (signed pay links).
+    5. Re-issue Bee's agent key so it may call pay_direct (it still can't call anything else).
   Run after playground-setup.ps1.
 
 .EXAMPLE
@@ -89,6 +90,12 @@ Pop-Location
 Ensure 'Preparing the invoice issuer key' $code
 & near contract call-function as-transaction $Vault set_invoice_issuer file-args (Join-Path $Work 'set-invoice-issuer.json') prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' sign-as $Owner @Net sign-with-keychain send | Out-Host
 Ensure 'Registering the invoice issuer'
+
+Step 5 "Re-issue Bee's agent key so it may call pay_direct as well as pay_quote (and nothing else)"
+$agentFile = Join-Path $Work 'agent-key.json'
+$AgentPk = (Get-Content $agentFile -Raw | ConvertFrom-Json).public_key
+& near contract call-function as-transaction $Vault set_agent_allowance file-args (ArgsFile 'allowance' @{ public_key = $AgentPk; allowance = '3000000000000000000000000' }) prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' sign-as $Owner @Net sign-with-keychain send | Out-Host
+Ensure "Re-issuing Bee's key"
 
 Write-Host ''
 & near contract call-function as-read-only $Vault get_recipients json-args '{}' @Net now | Out-Host
