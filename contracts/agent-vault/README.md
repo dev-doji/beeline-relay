@@ -94,7 +94,7 @@ Events use NEP-297 (`EVENT_JSON:`, standard `beeline-agent-vault`): `payment_req
 ## Build and test
 
 ```bash
-cargo test                                   # 70 unit tests
+cargo test                                   # 76 unit tests
 cargo near build non-reproducible-wasm       # optimized wasm for deployment
 ```
 
