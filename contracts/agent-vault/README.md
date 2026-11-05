@@ -92,4 +92,4 @@ On Windows, set `AWS_LC_SYS_PREBUILT_NASM=1` first: a test dependency needs NASM
 
 ## Status
 
-Unit-tested only. It has **not been deployed** to testnet or mainnet yet, and **has not been audited**. It is a hackathon prototype: hold only small amounts in it.
+Unit-tested, and **deployed on NEAR testnet** at `vault.goni-beeline.testnet` on 2026-11-05: an allowed payment succeeded and four attacks were rejected on-chain (see `docs/TESTNET_REHEARSAL.md`). It's **not on mainnet** and **has not been audited**. It is a hackathon prototype: hold only small amounts in it.

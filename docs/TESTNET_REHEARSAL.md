@@ -56,6 +56,21 @@ The script pauses before every step. In step 1 a browser window opens and **you*
 
 The explorer for your vault is `https://testnet.nearblocks.io/address/vault.yourname.testnet`.
 
+## Results: first full run (2026-11-05)
+
+The rehearsal ran end to end on NEAR testnet against `vault.goni-beeline.testnet`, using the wasm built by CI run 41996517700 (commit `ecd44c6`). Owner: `goni-beeline.testnet`. Token: `usdc.fakes.testnet`. Quotes were TEST-signed (1Click has no testnet). The agent signed with its function-call key, which can only call `pay_quote`.
+
+| Step | Transaction | On-chain result |
+|---|---|---|
+| Deploy and initialize the vault | [9xjUUKjTiU…](https://testnet.nearblocks.io/txns/9xjUUKjTiUVkQ3gzLDc6jwycVPkvq8n2oEuYFEGkKWaf) | ✅ Success |
+| Agent pays 1 test USDC to the allowlisted recipient | [C82h5aBx6b…](https://testnet.nearblocks.io/txns/C82h5aBx6bXtVeKM8R6RPHqdL4ZD8NHVy1FeceGCyCea) | ✅ Paid (`payment_requested` → token transfer → `payment_sent`) |
+| Attack: prompt-injected payment to `0x6666…` | [6MY4PeZXxN…](https://testnet.nearblocks.io/txns/6MY4PeZXxNDt6kavkxgekGqa11uof1wEb2DVakmnVGGE) | ❌ `BEELINE_VAULT_REJECTED: recipient 0x6666… is not on the allowlist` |
+| Attack: forged quote (signed by a different key) | [AjpeNfacc8…](https://testnet.nearblocks.io/txns/AjpeNfacc842Eevk5ZXcp7UJppmnFjTTqSFBAbHvgWEe) | ❌ `BEELINE_VAULT_REJECTED: quote signature is not from 1Click` |
+| Attack: 6 USDC, over the 5 USDC limit | [9cT4DFf1En…](https://testnet.nearblocks.io/txns/9cT4DFf1EnprRmTxZT47HB1FMZHRNTdXGYSmGtkptf5D) | ❌ `BEELINE_VAULT_REJECTED: amount 6000000 exceeds the per-payment limit 5000000` |
+| Attack: replay of the already-paid quote | [FFT7NMBgFa…](https://testnet.nearblocks.io/txns/FFT7NMBgFaiwAdk5epHToWskLnVP9dxaixwRVUdd93C1) | ❌ `BEELINE_VAULT_REJECTED: this deposit address has already been paid` |
+
+Afterwards `get_agents` showed the agent with 1 payment and 1,000,000 (1 test USDC) spent today. The rejected attacks moved nothing. All transactions: https://testnet.nearblocks.io/address/vault.goni-beeline.testnet
+
 ## Status
 
-The script was written on 2026-11-04 and **has not been run yet**. The near CLI command syntax is based on near-cli-rs. If a command's wording has changed, the CLI prints the accepted options; share the output and we'll adjust the script.
+The script was written on 2026-11-04 and **passed its first full run on 2026-11-05** (results above). The near CLI command syntax is based on near-cli-rs. If a command's wording has changed, the CLI prints the accepted options; share the output and we'll adjust the script.
