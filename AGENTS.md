@@ -2,6 +2,7 @@
 
 ## Work process
 
+0. Read `docs/HANDOFF.md` for the current state and next steps.
 1. Read `README.md`, `docs/PRD.md`, `docs/TRD.md`, `docs/ARCHITECTURE.md`, `docs/API_SPEC.md`, and `docs/MVP_SCOPE.md` before architecture or product changes.
 2. Read the component prompt in `prompts/` before implementing website, developer console, or backend work.
 3. Inspect the existing repository and working tree first. Preserve existing conventions and do not overwrite useful work without understanding it.
