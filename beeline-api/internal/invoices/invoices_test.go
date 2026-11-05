@@ -7,7 +7,7 @@ import (
 
 func valid() CreateInput {
 	return CreateInput{
-		VendorName: "Ada Fabrics", VendorHandle: "@adafabrics", Payout: "0x7777777777777777777777777777777777777777",
+		VendorName: "Ada Fabrics", VendorHandle: "@adafabrics", Payout: "ada-fabrics.goni-beeline.testnet",
 		Memo: "Order #18", Items: []Item{{Name: "Ankara dress", Quantity: 3, UnitPrice: "150000"}, {Name: "Delivery", Quantity: 1, UnitPrice: "50000"}},
 	}
 }
@@ -23,7 +23,7 @@ func TestValidateSumsItemsInBaseUnits(t *testing.T) {
 func TestValidateRejectsBadInput(t *testing.T) {
 	cases := map[string]func(*CreateInput){
 		"vendor":   func(in *CreateInput) { in.VendorName = " " },
-		"payout":   func(in *CreateInput) { in.Payout = "bob.near" },
+		"payout":   func(in *CreateInput) { in.Payout = "0x7777777777777777777777777777777777777777!" },
 		"no items": func(in *CreateInput) { in.Items = nil },
 		"price":    func(in *CreateInput) { in.Items[0].UnitPrice = "1.5" },
 		"qty":      func(in *CreateInput) { in.Items[0].Quantity = 0 },

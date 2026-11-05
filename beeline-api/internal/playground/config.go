@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/near"
 )
@@ -16,9 +18,10 @@ import (
 // FromEnv builds the playground config. It returns (nil, nil) when PLAYGROUND_VAULT is unset,
 // which disables the playground endpoints.
 //
-// Keys come from PLAYGROUND_AGENT_KEY / PLAYGROUND_QUOTE_SIGNER_KEY ("ed25519:<base58>"), or
-// from the files agent-key.json / test-quote-signer.json in PLAYGROUND_KEYS_DIR (the format
-// cmd/vault-testnet writes). Both are TESTNET-only keys.
+// The demo accounts default to acme.<owner>, ada-fabrics.<owner> and scammer.<owner> for a vault
+// named vault.<owner> (scripts/live-setup.ps1 creates them). Keys come from
+// PLAYGROUND_AGENT_KEY / PLAYGROUND_INVOICE_ISSUER_KEY ("ed25519:<base58>") or from the files
+// agent-key.json / invoice-issuer.json in PLAYGROUND_KEYS_DIR. Both are TESTNET-only keys.
 func FromEnv(lookup func(string) (string, bool)) (*Config, error) {
 	get := func(k, def string) string {
 		if v, ok := lookup(k); ok && strings.TrimSpace(v) != "" {
@@ -33,6 +36,7 @@ func FromEnv(lookup func(string) (string, bool)) (*Config, error) {
 	if !strings.HasSuffix(vault, ".testnet") {
 		return nil, errors.New("PLAYGROUND_VAULT must be a .testnet account: the playground never runs on mainnet")
 	}
+	owner := strings.TrimPrefix(vault, "vault.")
 	dir := get("PLAYGROUND_KEYS_DIR", "")
 	readKey := func(envName, file string) (string, error) {
 		if v := get(envName, ""); v != "" {
@@ -57,17 +61,9 @@ func FromEnv(lookup func(string) (string, bool)) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	agent, err := near.ParseKey(vault, agentSecret)
+	agentKey, err := near.ParseKey(vault, agentSecret)
 	if err != nil {
 		return nil, fmt.Errorf("PLAYGROUND_AGENT_KEY: %w", err)
-	}
-	signerSecret, err := readKey("PLAYGROUND_QUOTE_SIGNER_KEY", "test-quote-signer.json")
-	if err != nil {
-		return nil, err
-	}
-	signer, err := near.ParseKey("test-quote-signer", signerSecret)
-	if err != nil {
-		return nil, fmt.Errorf("PLAYGROUND_QUOTE_SIGNER_KEY: %w", err)
 	}
 	issuerSecret, err := readKey("PLAYGROUND_INVOICE_ISSUER_KEY", "invoice-issuer.json")
 	if err != nil {
@@ -78,62 +74,101 @@ func FromEnv(lookup func(string) (string, bool)) (*Config, error) {
 		return nil, fmt.Errorf("PLAYGROUND_INVOICE_ISSUER_KEY: %w", err)
 	}
 	return &Config{
-		Network:          "testnet",
-		Vault:            vault,
-		Token:            get("PLAYGROUND_TOKEN", "usdc.fakes.testnet"),
-		DestinationAsset: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
-		Allowed:          Recipient{Label: "Acme Design", Address: get("PLAYGROUND_ALLOWED_RECIPIENT", "0x1111111111111111111111111111111111111111")},
-		Attacker:         Recipient{Label: "Unknown address from an injected note", Address: "0x6666666666666666666666666666666666666666"},
-		DefaultAmount:    "100000",
-		ExplorerTxURL:    "https://testnet.nearblocks.io/txns/",
-		ExplorerAcctURL:  "https://testnet.nearblocks.io/address/",
-		AgentKey:         agent,
-		QuoteSigner:      ed25519.PrivateKey(signer.Private),
-		InvoiceIssuer:    ed25519.PrivateKey(issuer.Private),
+		Network:         "testnet",
+		Vault:           vault,
+		Token:           get("PLAYGROUND_TOKEN", "usdc.fakes.testnet"),
+		Approved:        Account{Label: "Acme Design", Account: get("PLAYGROUND_APPROVED_ACCOUNT", "acme."+owner), Role: "approved"},
+		Vendor:          Account{Label: "Ada Fabrics", Account: get("PLAYGROUND_VENDOR_ACCOUNT", "ada-fabrics."+owner), Role: "vendor"},
+		Scammer:         Account{Label: "Scammer", Account: get("PLAYGROUND_SCAMMER_ACCOUNT", "scammer."+owner), Role: "attacker"},
+		ExplorerTxURL:   "https://testnet.nearblocks.io/txns/",
+		ExplorerAcctURL: "https://testnet.nearblocks.io/address/",
+		AgentKey:        agentKey,
+		InvoiceIssuer:   ed25519.PrivateKey(issuer.Private),
 	}, nil
 }
 
-// State is the vault's live configuration, read from the chain for the UI.
+// LiveAccount is a demo account with its live token balance.
+type LiveAccount struct {
+	Account
+	Balance string `json:"balance"` // base units; "" if unknown
+	URL     string `json:"url"`
+}
+
+// State is the vault's live configuration and the demo accounts' balances, read from the chain.
 type State struct {
 	Network     string            `json:"network"`
 	Vault       string            `json:"vault"`
 	VaultURL    string            `json:"vault_url"`
 	Token       string            `json:"token"`
 	Agent       string            `json:"agent_public_key"`
-	Allowed     Recipient         `json:"allowed_recipient"`
-	Attacker    Recipient         `json:"attacker_recipient"`
+	Accounts    []LiveAccount     `json:"accounts"`
 	Config      json.RawMessage   `json:"config"`
 	Recipients  json.RawMessage   `json:"recipients"`
 	Reviewer    json.RawMessage   `json:"reviewer"`
 	Balances    json.RawMessage   `json:"balances"`
 	Agents      json.RawMessage   `json:"agents"`
-	Presets     map[string]Input  `json:"presets"`
+	Issuer      json.RawMessage   `json:"invoice_issuer"`
+	Presets     map[string]string `json:"presets"`
 	Disclosures map[string]string `json:"disclosures"`
 }
 
-// State reads the vault's views. Missing views are reported as null.
+// State reads the vault's views and the demo accounts' balances in parallel.
 func (s *Service) State(ctx context.Context) (*State, error) {
-	view := func(method string) json.RawMessage {
-		raw, err := s.Chain.View(ctx, s.Cfg.Vault, method, map[string]any{})
-		if err != nil || !json.Valid(raw) {
-			return json.RawMessage("null")
-		}
-		return raw
+	views := []string{"get_config", "get_recipients", "get_reviewer", "get_balances", "get_agents", "get_invoice_issuer"}
+	out := make(map[string]json.RawMessage, len(views))
+	accts := []Account{s.Cfg.Approved, s.Cfg.Vendor, s.Cfg.Scammer}
+	bal := make([]string, len(accts))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, m := range views {
+		wg.Add(1)
+		go func(m string) {
+			defer wg.Done()
+			raw, err := s.Chain.View(ctx, s.Cfg.Vault, m, map[string]any{})
+			if err != nil || !json.Valid(raw) {
+				raw = json.RawMessage("null")
+			}
+			mu.Lock()
+			out[m] = raw
+			mu.Unlock()
+		}(m)
 	}
-	st := &State{
-		Network: s.Cfg.Network, Vault: s.Cfg.Vault, VaultURL: s.Cfg.ExplorerAcctURL + s.Cfg.Vault,
-		Token: s.Cfg.Token, Agent: s.Cfg.AgentKey.PublicKey(), Allowed: s.Cfg.Allowed, Attacker: s.Cfg.Attacker,
-		Config: view("get_config"), Recipients: view("get_recipients"), Reviewer: view("get_reviewer"),
-		Balances: view("get_balances"), Agents: view("get_agents"), Presets: s.Presets(),
-		Disclosures: map[string]string{
-			"quotes":   "TESTNET-SIMULATED: 1Click has no testnet, so quotes are signed by the vault's test signer. A mainnet vault trusts only 1Click's real key.",
-			"review":   "Real: a NEAR AI Cloud completion with a TEE ed25519 signature that the vault verifies on-chain.",
-			"payment":  "Real NEAR testnet transaction. Test USDC (usdc.fakes.testnet) has no value.",
-			"agentKey": "The agent's key is a testnet function-call key that can only call pay_quote on this vault.",
-		},
+	for i, a := range accts {
+		wg.Add(1)
+		go func(i int, account string) {
+			defer wg.Done()
+			raw, err := s.Chain.View(ctx, s.Cfg.Token, "ft_balance_of", map[string]any{"account_id": account})
+			var b string
+			if err == nil && json.Unmarshal(raw, &b) == nil {
+				if _, ok := new(big.Int).SetString(b, 10); ok {
+					bal[i] = b
+				}
+			}
+		}(i, a.Account)
 	}
-	if string(st.Config) == "null" {
+	wg.Wait()
+	if string(out["get_config"]) == "null" {
 		return nil, errors.New("the vault is not reachable or not deployed")
 	}
-	return st, nil
+	var cfg struct {
+		MaxPerPayment string `json:"max_per_payment"`
+	}
+	_ = json.Unmarshal(out["get_config"], &cfg)
+	live := make([]LiveAccount, len(accts))
+	for i, a := range accts {
+		live[i] = LiveAccount{Account: a, Balance: bal[i], URL: s.Cfg.ExplorerAcctURL + a.Account}
+	}
+	return &State{
+		Network: s.Cfg.Network, Vault: s.Cfg.Vault, VaultURL: s.Cfg.ExplorerAcctURL + s.Cfg.Vault,
+		Token: s.Cfg.Token, Agent: s.Cfg.AgentKey.PublicKey(), Accounts: live,
+		Config: out["get_config"], Recipients: out["get_recipients"], Reviewer: out["get_reviewer"],
+		Balances: out["get_balances"], Agents: out["get_agents"], Issuer: out["get_invoice_issuer"],
+		Presets: s.Presets(cfg.MaxPerPayment),
+		Disclosures: map[string]string{
+			"agent":   "Bee is a NEAR AI model that decides whom to pay. It is deliberately naive: it follows instructions hidden in notes.",
+			"review":  "A second NEAR AI model, in a TEE, reviews each payment. The vault verifies its ed25519 signature on-chain.",
+			"payment": "Real NEAR testnet transactions moving test USDC (usdc.fakes.testnet, no value) to real testnet accounts.",
+			"mainnet": "On mainnet, the same guardrails pay cross-chain through NEAR Intents 1Click (pay_quote), which has no testnet.",
+		},
+	}, nil
 }

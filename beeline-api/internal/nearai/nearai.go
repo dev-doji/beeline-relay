@@ -58,7 +58,7 @@ func PolicySHA256() string {
 // ReviewTask builds the user message. It must contain the exact signed quote JSON, because the
 // vault checks that the reviewer was shown the quote being paid.
 func ReviewTask(task, quoteHash, quoteJSON string) string {
-	return fmt.Sprintf("Task the agent is working on:\n%s\n\nQuote hash: %s\n\nSigned 1Click quote the agent wants to pay:\n%s", task, quoteHash, quoteJSON)
+	return fmt.Sprintf("Task the agent is working on:\n%s\n\nQuote hash: %s\n\nThe exact payment the agent wants to make (a NEAR Intents quote or a direct payment request):\n%s", task, quoteHash, quoteJSON)
 }
 
 // Signature is NEAR AI's GET /v1/signature/{chat_id} response.
@@ -172,6 +172,38 @@ func (c *Client) Review(ctx context.Context, model, task, quoteHash, quoteJSON s
 		RequestSHA256:  sha256Hex(body),
 		ResponseSHA256: sha256Hex(respBody),
 	}, nil
+}
+
+// Complete runs one non-streaming chat completion and returns the assistant's text. It is used
+// for the playground agent's decisions (no signature is needed there).
+func (c *Client) Complete(ctx context.Context, model, system, user string) (string, error) {
+	body, err := json.Marshal(map[string]any{
+		"model": model,
+		"messages": []map[string]string{
+			{"role": "system", "content": system},
+			{"role": "user", "content": user},
+		},
+		"temperature": 0,
+		"stream":      false,
+	})
+	if err != nil {
+		return "", err
+	}
+	raw, err := c.send(ctx, http.MethodPost, "/v1/chat/completions", body)
+	if err != nil {
+		return "", err
+	}
+	var parsed struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil || len(parsed.Choices) == 0 {
+		return "", errors.New("near ai cloud: completion has no answer")
+	}
+	return parsed.Choices[0].Message.Content, nil
 }
 
 // Signature fetches the ed25519 signature for a completion, retrying briefly while NEAR AI

@@ -306,3 +306,8 @@ func truncate(s string, n int) string {
 	}
 	return s[:n]
 }
+
+// SecretForTest returns the "ed25519:<base58>" private key string. Tests only.
+func (k Key) SecretForTest() string {
+	return "ed25519:" + base58.Encode(k.Private)
+}

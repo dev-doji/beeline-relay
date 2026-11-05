@@ -16,6 +16,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/agent"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/config"
@@ -76,10 +77,19 @@ func run() error {
 			Now:   time.Now,
 		}
 		if key := os.Getenv("NEAR_AI_API_KEY"); key != "" {
-			pg.Reviewer = nearai.NewClient(os.Getenv("NEAR_AI_API_BASE_URL"), key, 120*time.Second)
+			ai := nearai.NewClient(os.Getenv("NEAR_AI_API_BASE_URL"), key, 120*time.Second)
+			pg.Reviewer = ai
+			pg.Agent = &agent.Agent{
+				LLM:   ai,
+				Model: envOr("NEAR_AI_AGENT_MODEL", "z-ai/glm-5.3-flash"),
+				Contacts: []agent.Contact{
+					{Name: pgCfg.Approved.Label + " (approved supplier)", Account: pgCfg.Approved.Account},
+					{Name: pgCfg.Vendor.Label + " (vendor)", Account: pgCfg.Vendor.Account},
+				},
+			}
 		}
-		inv = &invoices.Service{DB: pool, Issuer: pgCfg.InvoiceIssuer, Asset: pgCfg.DestinationAsset, TTL: 7 * 24 * time.Hour, Now: time.Now}
-		log.Info("playground enabled", "vault", pgCfg.Vault, "live_reviews", pg.Reviewer != nil, "invoice_issuer", inv.IssuerPublicKeyHex())
+		inv = &invoices.Service{DB: pool, Issuer: pgCfg.InvoiceIssuer, Asset: "nep141:" + pgCfg.Token, TTL: 7 * 24 * time.Hour, Now: time.Now}
+		log.Info("playground enabled", "vault", pgCfg.Vault, "live_ai", pg.Reviewer != nil, "invoice_issuer", inv.IssuerPublicKeyHex())
 	}
 
 	cat := catalog.Default()

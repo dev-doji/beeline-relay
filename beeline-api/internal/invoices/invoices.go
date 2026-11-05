@@ -28,8 +28,9 @@ const MaxAmount = 5_000_000
 
 var (
 	ErrNotFound = errors.New("invoice not found")
-	evmRe       = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
-	unitsRe     = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
+	// NEAR account IDs: named (ada.testnet, shop.ada.testnet) or implicit (64 hex).
+	nearAccountRe = regexp.MustCompile(`^(([a-z\d]+[\-_])*[a-z\d]+\.)*([a-z\d]+[\-_])*[a-z\d]+$`)
+	unitsRe       = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
 )
 
 type Item struct {
@@ -102,8 +103,9 @@ func Validate(in *CreateInput) (string, error) {
 	if len(in.VendorHandle) > 60 || len(in.Memo) > 200 {
 		return "", errors.New("vendor_handle must be at most 60 and memo at most 200 characters")
 	}
-	if !evmRe.MatchString(in.Payout) {
-		return "", errors.New("payout must be a 0x… address on Base")
+	in.Payout = strings.ToLower(in.Payout)
+	if !nearAccountRe.MatchString(in.Payout) || len(in.Payout) < 2 || len(in.Payout) > 64 {
+		return "", errors.New("payout must be a NEAR account, e.g. ada-fabrics.yourname.testnet")
 	}
 	if len(in.Items) == 0 || len(in.Items) > 10 {
 		return "", errors.New("an invoice needs 1-10 items")
@@ -138,7 +140,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*Invoice, error) 
 	}
 	now := s.Now().UTC()
 	expires := now.Add(s.TTL).Truncate(time.Second)
-	p := Payload{V: 1, ID: ids.New(ids.Invoice), Vendor: in.VendorName, Payout: strings.ToLower(in.Payout),
+	p := Payload{V: 1, ID: ids.New(ids.Invoice), Vendor: in.VendorName, Payout: in.Payout,
 		Asset: s.Asset, Amount: amount, ExpiresAt: expires.Unix(), Memo: in.Memo}
 	payload, err := json.Marshal(p)
 	if err != nil {
