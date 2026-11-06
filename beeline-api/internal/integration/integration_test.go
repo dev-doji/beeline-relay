@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	var err error
-	pool, err = storage.Open(context.Background(), url)
+	pool, err = storage.Open(context.Background(), url, nil)
 	if err != nil {
 		panic(err)
 	}

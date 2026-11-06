@@ -29,7 +29,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	pool, err := storage.Open(ctx, dbURL)
+	pool, err := storage.Open(ctx, dbURL, nil)
 	if err != nil {
 		fail(err.Error())
 	}

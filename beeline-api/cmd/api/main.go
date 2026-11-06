@@ -51,7 +51,8 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := storage.Open(ctx, cfg.DatabaseURL)
+	log.Info("starting", "port", cfg.Port, "env", cfg.Env)
+	pool, err := storage.Open(ctx, cfg.DatabaseURL, log)
 	if err != nil {
 		return err
 	}
