@@ -8,10 +8,12 @@
   your service -> Environment, then close this window. Never paste them into a chat or commit them.
 
 .EXAMPLE
-  .\scripts\hosting-env.ps1 -WebUrl https://beeline-relay.vercel.app
+  .\scripts\hosting-env.ps1
+  .\scripts\hosting-env.ps1 -WebUrl https://usebeeline.xyz, https://beeline-relay.vercel.app
 #>
 param(
-  [Parameter(Mandatory = $true)][string]$WebUrl
+  # The website addresses allowed to call the API (CORS). Exact origins, no trailing slash.
+  [string[]]$WebUrl = @('https://usebeeline.xyz', 'https://www.usebeeline.xyz')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,7 +31,7 @@ function KeyFile($file) {
 $vault = EnvValue 'PLAYGROUND_VAULT'
 $lines = @(
   "DATABASE_URL=$(EnvValue 'DATABASE_URL')",
-  "CORS_ALLOWED_ORIGINS=$($WebUrl.TrimEnd('/'))",
+  "CORS_ALLOWED_ORIGINS=$(($WebUrl | ForEach-Object { $_.Trim().TrimEnd('/') }) -join ',')",
   "PLAYGROUND_VAULT=$vault",
   "PLAYGROUND_AGENT_KEY=$(KeyFile 'agent-key.json')",
   "PLAYGROUND_INVOICE_ISSUER_KEY=$(KeyFile 'invoice-issuer.json')",
