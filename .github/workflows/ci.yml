@@ -95,6 +95,14 @@ jobs:
       - name: build
         run: pnpm build
 
+  container:
+    name: API container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: docker build (the image Render deploys)
+        run: docker build -t beeline-api ./beeline-api
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

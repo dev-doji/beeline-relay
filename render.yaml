@@ -1,0 +1,45 @@
+# Render blueprint for the Beeline API (free plan). See docs/DEPLOY.md.
+# Values marked `sync: false` are secrets: Render asks for them when you create the service.
+# The website is deployed separately on Vercel (root directory: beeline-web).
+services:
+  - type: web
+    name: beeline-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerContext: ./beeline-api
+    dockerfilePath: ./beeline-api/Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: MIGRATE_ON_START
+        value: "true"
+      - key: NEAR_RPC_URL
+        value: https://rpc.testnet.fastnear.com
+      - key: NEAR_AI_REVIEW_MODEL
+        value: z-ai/glm-5.3-flash
+      - key: NEAR_AI_AGENT_MODEL
+        value: z-ai/glm-5.3-flash
+      - key: PLAYGROUND_RUNS_PER_MINUTE
+        value: "4"
+      - key: PLAYGROUND_RUNS_PER_DAY
+        value: "300"
+      # Secrets and deployment-specific values (scripts/hosting-env.ps1 prints them locally):
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: PLAYGROUND_VAULT
+        sync: false
+      - key: PLAYGROUND_AGENT_KEY
+        sync: false
+      - key: PLAYGROUND_INVOICE_ISSUER_KEY
+        sync: false
+      - key: NEAR_AI_API_KEY
+        sync: false
+      - key: NEAR_INTENTS_API_KEY
+        sync: false

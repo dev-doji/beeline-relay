@@ -129,6 +129,10 @@ go run ./cmd/seed -name "Dev workspace"   # prints API keys once; only hashes ar
 | GET | `/api/v1/payments`, `/api/v1/payments/{id}` | Bearer | Workspace-scoped payments |
 | GET | `/api/v1/payments/{id}/events` | Bearer | Append-only event timeline |
 
+## Deploy (free)
+
+The API runs on Render (from `beeline-api/Dockerfile` and `render.yaml`), the website on Vercel (`beeline-web/`), and the database on Neon. The step-by-step guide is in [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Run the Playground locally
 
 The Playground needs the testnet vault from the rehearsal below. Add to `beeline-api/.env`: `PLAYGROUND_VAULT=vault.<you>.testnet` and `PLAYGROUND_KEYS_DIR=.testnet`, plus `NEAR_AI_API_KEY` for live AI reviews. Then:
