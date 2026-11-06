@@ -37,9 +37,12 @@ type Key struct {
 
 // ParseKey parses "ed25519:<base58 of 64-byte private key>".
 func ParseKey(accountID, secret string) (Key, error) {
-	raw, err := base58.Decode(strings.TrimPrefix(strings.TrimSpace(secret), "ed25519:"))
+	s := strings.TrimSpace(secret)
+	raw, err := base58.Decode(strings.TrimPrefix(s, "ed25519:"))
 	if err != nil || len(raw) != ed25519.PrivateKeySize {
-		return Key{}, errors.New("near: private key must be ed25519:<base58 64-byte key>")
+		// Describe the shape of the value to help fix a bad paste, never the value itself.
+		return Key{}, fmt.Errorf("near: private key must be ed25519:<base58 64-byte key> (got %d characters, starts with ed25519: %t, contains '=' %t, contains quotes %t)",
+			len(s), strings.HasPrefix(s, "ed25519:"), strings.Contains(s, "="), strings.ContainsAny(s, `"'`))
 	}
 	return Key{AccountID: accountID, Private: ed25519.PrivateKey(raw)}, nil
 }
