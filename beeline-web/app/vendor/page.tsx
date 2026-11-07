@@ -19,6 +19,9 @@ const START: DraftItem[] = [
   { name: "Express delivery", quantity: "1", price: "0.05" },
 ];
 
+const dare = (vendor: string, link: string) =>
+  `Can you trick my AI payment agent into paying you instead of ${vendor}? Try anything: ${link}`;
+
 const NEAR_ACCOUNT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 
 export default function VendorPage() {
@@ -89,13 +92,12 @@ export default function VendorPage() {
     <div className="frame-inner">
       <div className="page-head">
         <span className="pill pill-honey">
-          <Store size={13} aria-hidden /> Vendor demo · NEAR testnet
+          <Store size={13} aria-hidden /> Step 1 of 2 · NEAR testnet
         </span>
-        <h1>Send a pay link that can’t be hijacked</h1>
+        <h1>Create a pay link. Then dare someone to steal it.</h1>
         <p>
-          Create an invoice like you would on Instagram or WhatsApp. Beeline signs it, so if a scammer copies your link and
-          swaps in their account, or changes the amount, the payment is refused on-chain. Genuine payments land in your real
-          testnet account.
+          Beeline signs your invoice. Send the link to anyone and let them try to trick the AI agent that pays it, with their own
+          words or an edited link. Every attempt is public and decided on-chain.
         </p>
       </div>
 
@@ -183,7 +185,7 @@ export default function VendorPage() {
           {created && (
             <div className="panel" style={{ animation: "rise .45s var(--ease-out) both" }}>
               <h2>
-                <Check size={18} color="var(--ok)" aria-hidden style={{ verticalAlign: "-3px" }} /> Your pay link is ready
+                <Check size={18} color="var(--ok)" aria-hidden style={{ verticalAlign: "-3px" }} /> Step 2: send it to someone and dare them
               </h2>
               <div className="share">
                 <div className="qr" aria-label="QR code for the pay link">
@@ -206,15 +208,13 @@ export default function VendorPage() {
                   </div>
                   <div className="actions">
                     <Link className="btn btn-honey" href={`/pay/${created.id}`}>
-                      Open as buyer <ExternalLink size={16} aria-hidden />
+                      Open it and try yourself <ExternalLink size={16} aria-hidden />
                     </Link>
-                    <a
-                      className="btn"
-                      href={`https://wa.me/?text=${encodeURIComponent(`Hi! Here's your invoice from ${vendor}: ${link}`)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
+                    <a className="btn" href={`https://wa.me/?text=${encodeURIComponent(dare(vendor, link))}`} target="_blank" rel="noreferrer">
                       <MessageCircle size={16} aria-hidden /> WhatsApp
+                    </a>
+                    <a className="btn" href={`https://x.com/intent/post?text=${encodeURIComponent(dare(vendor, link))}`} target="_blank" rel="noreferrer">
+                      Post on X
                     </a>
                   </div>
                 </div>

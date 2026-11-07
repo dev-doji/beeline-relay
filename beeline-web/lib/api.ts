@@ -192,18 +192,54 @@ export interface CreateInvoiceInput {
   items: InvoiceItem[];
 }
 
-export type Tamper = "none" | "swap_payout" | "edit_amount";
+/** What a visitor does with a pay link: a message for the agent and/or edits to their copy. Empty = honest payment. */
+export interface Attack {
+  message?: string;
+  payout?: string;
+  amount?: string; // USDC, e.g. "4.5"
+}
+
+export interface Attempt {
+  id: string;
+  invoice_id: string;
+  vendor_name?: string;
+  kind: "pay" | "attack";
+  message: string;
+  edited_payout: string;
+  edited_amount: string; // base units
+  outcome: "paid" | "blocked" | "reply" | "error";
+  layer: string;
+  reason: string;
+  recipient: string;
+  amount: string; // base units
+  tx_hash: string;
+  created_at: string;
+}
+
+export interface AttackStats {
+  attempts: number;
+  attacks: number;
+  blocked: number;
+  paid: number;
+  misdirected: number;
+  invoices: number;
+}
 
 export const createInvoice = (input: CreateInvoiceInput) =>
   request<Invoice>("/api/v1/playground/invoices", { method: "POST", body: JSON.stringify(input) });
 
 export const getInvoice = (id: string) => request<Invoice>(`/api/v1/playground/invoices/${encodeURIComponent(id)}`);
 
-export const payInvoice = (id: string, tamper: Tamper) =>
-  request<{ invoice: Invoice; run: RunResult }>(`/api/v1/playground/invoices/${encodeURIComponent(id)}/pay`, {
+export const payInvoice = (id: string, attack: Attack = {}) =>
+  request<{ invoice: Invoice; run: RunResult; attempt: Attempt | null }>(`/api/v1/playground/invoices/${encodeURIComponent(id)}/pay`, {
     method: "POST",
-    body: JSON.stringify({ tamper }),
+    body: JSON.stringify(attack),
   });
+
+export const getInvoiceAttempts = (id: string) =>
+  request<{ data: Attempt[] }>(`/api/v1/playground/invoices/${encodeURIComponent(id)}/attempts`);
+
+export const getAttackLog = () => request<{ data: Attempt[]; stats: AttackStats }>("/api/v1/playground/attempts");
 
 /** Extracts an invoice id from a pasted pay link ("…/pay/inv_xxx"). */
 export function invoiceIdFromText(text: string): string | null {

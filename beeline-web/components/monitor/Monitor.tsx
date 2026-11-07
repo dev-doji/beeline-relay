@@ -87,7 +87,7 @@ export function Monitor() {
   const update = (id: number, patch: Partial<Item>) => setItems((xs) => xs.map((x) => (x.id === id ? { ...x, ...patch } : x)));
 
   async function process(item: Item): Promise<RunResult> {
-    if (item.kind === "invoice" && item.invoiceId) return (await payInvoice(item.invoiceId, "none")).run;
+    if (item.kind === "invoice" && item.invoiceId) return (await payInvoice(item.invoiceId)).run;
     return sendMessage(item.text);
   }
 

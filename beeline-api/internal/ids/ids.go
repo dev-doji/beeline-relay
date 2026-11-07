@@ -25,4 +25,5 @@ const (
 	Payment   = "pay"
 	Event     = "evt"
 	Invoice   = "inv"
+	Attempt   = "att"
 )

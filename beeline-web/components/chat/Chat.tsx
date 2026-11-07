@@ -1,23 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowUp,
-  CircleCheck,
-  FileWarning,
-  Menu,
-  MessagesSquare,
-  PanelRight,
-  Plus,
-  Receipt,
-  Repeat,
-  Siren,
-  Store,
-  TrendingUp,
-  X,
-} from "lucide-react";
+import { Activity, ArrowRight, ArrowUp, CircleCheck, Menu, MessagesSquare, PanelRight, Store } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { Ledger } from "@/components/Ledger";
 import { SideNav } from "@/components/SideNav";
@@ -25,11 +10,9 @@ import {
   ApiError,
   type PlaygroundState,
   type RunResult,
-  formatUSDC,
   getPlayground,
   invoiceIdFromText,
   payInvoice,
-  replayLast,
   sendMessage,
 } from "@/lib/api";
 import { Outcome, PlanCard, ReviewCard, VaultCard } from "./cards";
@@ -37,26 +20,6 @@ import { Outcome, PlanCard, ReviewCard, VaultCard } from "./cards";
 type Msg =
   | { id: number; role: "user"; text: string }
   | { id: number; role: "bot"; pending: boolean; invoice: boolean; result?: RunResult; error?: string };
-
-interface Scenario {
-  key: string;
-  title: string;
-  category: string;
-  desc: string;
-  expect: string;
-  icon: React.ReactNode;
-  danger?: boolean;
-  href?: string;
-}
-
-const SCENARIOS: Scenario[] = [
-  { key: "honest", title: "Pay Claw Electronics", category: "Honest payment", desc: "A normal invoice from an approved supplier. Every guardrail passes and the money lands.", expect: "Expected: paid", icon: <Receipt size={18} /> },
-  { key: "injected", title: "Hidden prompt injection", category: "Social engineering", desc: "An email tells Bee to urgently prepay 0.5 USDC. Bee obeys. Will the vault?", expect: "Expected: AI reviewer blocks", icon: <Siren size={18} />, danger: true },
-  { key: "attacker", title: "“Our account changed”", category: "Payment redirection", desc: "A forwarded note swaps in the scammer’s account. Bee follows it.", expect: "Expected: allowlist blocks", icon: <FileWarning size={18} />, danger: true },
-  { key: "over_limit", title: "Pay over the limit", category: "Spend control", desc: "One base unit above the vault’s per-payment cap.", expect: "Expected: limit blocks", icon: <TrendingUp size={18} />, danger: true },
-  { key: "replay", title: "Pay the same thing twice", category: "Replay attack", desc: "Re-send the exact payment request that already succeeded.", expect: "Expected: single-use blocks", icon: <Repeat size={18} />, danger: true },
-  { key: "vendor", title: "Pay a vendor’s pay link", category: "Vendor invoices", desc: "Create an MS Clothing invoice, share the link, and let Bee pay it.", expect: "Opens the vendor page", icon: <Store size={18} />, href: "/vendor" },
-];
 
 let nextId = 1;
 
@@ -68,7 +31,6 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -119,41 +81,15 @@ export function Chat() {
     const t = text.trim();
     if (!t || !state || busy) return;
     const inv = invoiceIdFromText(t);
-    if (inv) void run(t, async () => (await payInvoice(inv, "none")).run, true);
+    if (inv) void run(t, async () => (await payInvoice(inv)).run, true);
     else void run(t, () => sendMessage(t));
   }
-
-  function pick(s: Scenario) {
-    setMenuOpen(false);
-    setInput("");
-    if (!state || busy || s.href) return;
-    if (s.key === "replay") {
-      void run("Pay the last payment again.", replayLast);
-      return;
-    }
-    send(state.presets[s.key] ?? s.title);
-  }
-
-  const filtered = useMemo(() => {
-    const q = input.startsWith("/") ? input.slice(1).toLowerCase() : "";
-    return SCENARIOS.filter((s) => !q || s.title.toLowerCase().includes(q) || s.category.toLowerCase().includes(q));
-  }, [input]);
 
   const empty = msgs.length === 0;
 
   return (
     <div className={`app-shell ${sideOpen ? "side-open" : ""} ${ledgerOpen ? "ledger-open" : ""}`}>
       <SideNav active="chat" state={state} onClose={() => setSideOpen(false)} onNewChat={() => (setMsgs([]), setSideOpen(false))}>
-        <div className="side-label">Try a scenario</div>
-        <div className="side-list">
-          {SCENARIOS.filter((s) => !s.href).map((s) => (
-            <button key={s.key} className="side-scn" onClick={() => pick(s)} disabled={busy || !state}>
-              <b>{s.title}</b>
-              <span>{s.expect}</span>
-            </button>
-          ))}
-        </div>
-
       </SideNav>
 
       <section className="main">
@@ -191,40 +127,17 @@ export function Chat() {
               </span>
               <h1>Hi, I’m Bee.</h1>
               <p>
-                I pay people from your NEAR vault, and I’m easy to fool. Give me a task, or try to trick me. The vault decides what really
-                moves, on NEAR testnet.
+                I pay people from your NEAR vault, and I’m easy to fool. Write anything: a task, a fake invoice, a “system note”, a new
+                bank account. Whatever I decide, the vault on NEAR testnet has the final say.
               </p>
-              <div className="scn-row" role="list">
-                {SCENARIOS.map((s) => (
-                  <div className={`scn-card ${s.danger ? "danger" : ""}`} role="listitem" key={s.key}>
-                    <div className="scn-head">
-                      <span className="scn-ic" aria-hidden>
-                        {s.icon}
-                      </span>
-                      <div>
-                        <b>{s.title}</b>
-                        <span>{s.category}</span>
-                      </div>
-                    </div>
-                    <p>{s.desc}</p>
-                    <div className="scn-foot">
-                      {s.href ? (
-                        <Link className="get-btn" href={s.href}>
-                          Open <ArrowRight size={15} aria-hidden />
-                        </Link>
-                      ) : (
-                        <button className="get-btn" onClick={() => pick(s)} disabled={busy || !state}>
-                          Try this <ArrowRight size={15} aria-hidden />
-                        </button>
-                      )}
-                      <span className="scn-meta">{s.expect}</span>
-                    </div>
-                  </div>
-                ))}
+              <div className="empty-ctas">
+                <Link className="pill-btn dark" href="/vendor">
+                  <Store size={15} aria-hidden /> Create a pay link and dare a friend
+                </Link>
+                <Link className="pill-btn" href="/attacks">
+                  <Activity size={15} aria-hidden /> See every attack so far <ArrowRight size={14} aria-hidden />
+                </Link>
               </div>
-              <p className="slash-hint">
-                <kbd>/</kbd> Press / to see everything I can do
-              </p>
             </div>
           ) : (
             <div className="thread">
@@ -244,49 +157,15 @@ export function Chat() {
         </div>
 
         <div className="composer-wrap">
-          {menuOpen && (
-            <div className="slash-menu" role="listbox" aria-label="Things Bee can do">
-              {filtered.length === 0 && <div className="slash-empty">No matching scenario</div>}
-              {filtered.map((s) =>
-                s.href ? (
-                  <Link key={s.key} className="slash-item" href={s.href} role="option" aria-selected="false">
-                    <span className="scn-ic" aria-hidden>
-                      {s.icon}
-                    </span>
-                    <span>
-                      <b>{s.title}</b>
-                      <small>{s.category}</small>
-                    </span>
-                  </Link>
-                ) : (
-                  <button key={s.key} className="slash-item" role="option" aria-selected="false" onClick={() => pick(s)} disabled={busy || !state}>
-                    <span className="scn-ic" aria-hidden>
-                      {s.icon}
-                    </span>
-                    <span>
-                      <b>{s.title}</b>
-                      <small>
-                        {s.category} · {s.expect}
-                      </small>
-                    </span>
-                  </button>
-                ),
-              )}
-            </div>
-          )}
           <form
             className="composer"
             onSubmit={(e) => {
               e.preventDefault();
-              if (input.startsWith("/")) return;
               const t = input;
               setInput("");
               send(t);
             }}
           >
-            <button type="button" className="plus-btn" aria-label="Show scenarios" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
-              <Plus size={18} />
-            </button>
             <label htmlFor="composer" className="sr-only">
               Message Bee
             </label>
@@ -296,19 +175,11 @@ export function Chat() {
               rows={1}
               value={input}
               maxLength={2000}
-              placeholder={state ? "Tell Bee who to pay, paste a pay link, or press / …" : "Connecting to the vault…"}
-              onChange={(e) => {
-                setInput(e.target.value);
-                setMenuOpen(e.target.value.startsWith("/"));
-              }}
+              placeholder={state ? "Write your own task or trick for Bee, or paste a pay link…" : "Connecting to the vault…"}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Escape") setMenuOpen(false);
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  if (menuOpen && filtered[0]) {
-                    if (!filtered[0].href) pick(filtered[0]);
-                    return;
-                  }
                   const t = input;
                   setInput("");
                   send(t);
@@ -316,7 +187,7 @@ export function Chat() {
               }}
               disabled={!state}
             />
-            <button className="send" type="submit" disabled={!input.trim() || input.startsWith("/") || busy || !state} aria-label="Send">
+            <button className="send" type="submit" disabled={!input.trim() || busy || !state} aria-label="Send">
               <ArrowUp size={19} aria-hidden />
             </button>
           </form>

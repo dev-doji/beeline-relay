@@ -78,7 +78,7 @@ func run() error {
 			Now:   time.Now,
 		}
 		if key := os.Getenv("NEAR_AI_API_KEY"); key != "" {
-			ai := nearai.NewClient(os.Getenv("NEAR_AI_API_BASE_URL"), key, 120*time.Second)
+			ai := nearai.NewClient(os.Getenv("NEAR_AI_API_BASE_URL"), key, 60*time.Second)
 			pg.Reviewer = ai
 			pg.Agent = &agent.Agent{
 				LLM:   ai,

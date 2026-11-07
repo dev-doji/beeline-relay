@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Github, Landmark, MessagesSquare, Radar, Store, X } from "lucide-react";
+import { Activity, Github, Landmark, MessagesSquare, Radar, Store, X } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { type PlaygroundState, REPO_URL, formatUSDC } from "@/lib/api";
 
@@ -13,7 +13,7 @@ export function SideNav({
   onNewChat,
   children,
 }: {
-  active: "chat" | "monitor" | "vendor";
+  active: "chat" | "monitor" | "vendor" | "attacks";
   state: PlaygroundState | null;
   onClose: () => void;
   onNewChat?: () => void;
@@ -29,6 +29,12 @@ export function SideNav({
           <X size={18} />
         </button>
       </div>
+      <Link className={`side-item ${active === "vendor" ? "active" : ""}`} href="/vendor">
+        <Store size={18} aria-hidden /> Create a pay link
+      </Link>
+      <Link className={`side-item ${active === "attacks" ? "active" : ""}`} href="/attacks">
+        <Activity size={18} aria-hidden /> Attack log
+      </Link>
       <Link className={`side-item ${active === "monitor" ? "active" : ""}`} href="/monitor">
         <Radar size={18} aria-hidden /> Monitor
       </Link>
@@ -41,9 +47,6 @@ export function SideNav({
           <MessagesSquare size={18} aria-hidden /> Chat with Bee
         </Link>
       )}
-      <Link className={`side-item ${active === "vendor" ? "active" : ""}`} href="/vendor">
-        <Store size={18} aria-hidden /> Vendor pay links
-      </Link>
       <a className="side-item" href={state?.vault_url ?? "#"} target="_blank" rel="noreferrer">
         <Landmark size={18} aria-hidden /> Vault on NearBlocks
       </a>

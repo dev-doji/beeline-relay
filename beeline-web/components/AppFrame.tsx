@@ -6,7 +6,7 @@ import { SideNav } from "@/components/SideNav";
 import { type PlaygroundState, getPlayground } from "@/lib/api";
 
 /** The app layout (sidebar + scrolling content) for pages without the live ledger column. */
-export function AppFrame({ active, title, icon, children }: { active: "vendor"; title: string; icon: React.ReactNode; children: React.ReactNode }) {
+export function AppFrame({ active, title, icon, children }: { active: "vendor" | "attacks"; title: string; icon: React.ReactNode; children: React.ReactNode }) {
   const [state, setState] = useState<PlaygroundState | null>(null);
   const [sideOpen, setSideOpen] = useState(false);
 

@@ -83,6 +83,8 @@ func NewRouter(d Deps) http.Handler {
 		r.Post("/playground/invoices", h.createInvoice)
 		r.Get("/playground/invoices/{id}", h.getInvoice)
 		r.Post("/playground/invoices/{id}/pay", h.payInvoice)
+		r.Get("/playground/invoices/{id}/attempts", h.invoiceAttempts)
+		r.Get("/playground/attempts", h.attackLog)
 
 		r.Group(func(r chi.Router) {
 			r.Use(requireAuth(d.Auth, d.Logger))

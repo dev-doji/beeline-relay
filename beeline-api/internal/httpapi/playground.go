@@ -176,11 +176,16 @@ func (h *handlers) payInvoice(w http.ResponseWriter, r *http.Request) {
 	if !h.invoicesEnabled(w, r) {
 		return
 	}
-	var in struct {
-		Tamper string `json:"tamper"`
-	}
-	if err := decodeJSON(w, r, &in); err != nil {
+	// Everything here is written by whoever holds the link: an honest payer sends {}, an
+	// attacker sends a message for the agent and/or edits to their copy of the link.
+	var att playground.Attack
+	if err := decodeJSON(w, r, &att); err != nil {
 		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	editedAmount, err := att.Normalize()
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, apperr.Validation(err.Error()))
 		return
 	}
 	inv, err := h.d.Invoices.Get(r.Context(), chi.URLParam(r, "id"))
@@ -197,21 +202,73 @@ func (h *handlers) payInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 150*time.Second)
 	defer cancel()
-	res, err := h.d.Playground.PayInvoice(ctx, inv, in.Tamper)
+	res, err := h.d.Playground.PayInvoice(ctx, inv, att)
 	if err != nil {
 		writeAppError(w, r, h.d.Logger, apperr.Validation(err.Error()))
 		return
 	}
-	// The vault's on-chain decision is the source of truth: record "paid" only for a genuine
-	// invoice the vault accepted and sent.
-	if res.Outcome == "paid" && (in.Tamper == "" || in.Tamper == playground.TamperNone) {
-		if err := h.d.Invoices.MarkPaid(context.WithoutCancel(r.Context()), inv.ID, res.TxHash); err != nil {
+	bg := context.WithoutCancel(r.Context())
+	// The vault's on-chain decision is the source of truth. Mark the invoice paid only when the
+	// vault sent exactly the invoice's payee and amount.
+	if res.Outcome == "paid" && res.Recipient == inv.Payout && res.Amount == inv.Amount {
+		if err := h.d.Invoices.MarkPaid(bg, inv.ID, res.TxHash); err != nil {
 			h.d.Logger.Error("mark invoice paid", "invoice", inv.ID, "error", err)
 		}
 	}
-	updated, err := h.d.Invoices.Get(context.WithoutCancel(r.Context()), inv.ID)
+	kind := "pay"
+	if att.Message != "" || (att.Payout != "" && att.Payout != inv.Payout) || (editedAmount != "" && editedAmount != inv.Amount) {
+		kind = "attack"
+	}
+	payout := ""
+	if att.Payout != inv.Payout {
+		payout = att.Payout
+	}
+	if editedAmount == inv.Amount {
+		editedAmount = ""
+	}
+	attempt, err := h.d.Invoices.RecordAttempt(bg, invoices.Attempt{InvoiceID: inv.ID, Kind: kind, Message: att.Message, EditedPayout: payout,
+		EditedAmount: editedAmount, Outcome: res.Outcome, Layer: res.Layer, Reason: res.Reason, Recipient: res.Recipient, Amount: res.Amount, TxHash: res.TxHash})
+	if err != nil {
+		h.d.Logger.Error("record attempt", "invoice", inv.ID, "error", err)
+	}
+	updated, err := h.d.Invoices.Get(bg, inv.ID)
 	if err != nil {
 		updated = inv
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"invoice": updated, "run": res})
+	writeJSON(w, http.StatusOK, map[string]any{"invoice": updated, "run": res, "attempt": attempt})
+}
+
+func (h *handlers) invoiceAttempts(w http.ResponseWriter, r *http.Request) {
+	if !h.invoicesEnabled(w, r) {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if _, err := h.d.Invoices.Get(r.Context(), id); errors.Is(err, invoices.ErrNotFound) {
+		writeAppError(w, r, h.d.Logger, apperr.New(http.StatusNotFound, apperr.CodeNotFound, "Invoice not found."))
+		return
+	}
+	list, err := h.d.Invoices.Attempts(r.Context(), id, 50)
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+}
+
+// attackLog is the public log of every attempt on every pay link, with totals.
+func (h *handlers) attackLog(w http.ResponseWriter, r *http.Request) {
+	if !h.invoicesEnabled(w, r) {
+		return
+	}
+	list, err := h.d.Invoices.Attempts(r.Context(), "", 50)
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	stats, err := h.d.Invoices.Stats(r.Context())
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": list, "stats": stats})
 }
