@@ -47,8 +47,9 @@ Deploying the vault contract to mainnet locks roughly 4 to 5 NEAR as storage (th
 | Naira to USDC through Switch | 4,500 NGN (about $3.25), plus Switch's spread |
 | Base to NEAR bridge fee | under $0.05 |
 | NEAR to Base payout fee | about $0.01 to $0.03 |
-| NEAR gas for steps 2 and 3 | about 0.1 NEAR (about $0.40) |
-| **Total at risk** | **about $4, never more than the $10 cap** |
+| Gas on Base for step 2 (paid in ETH) | about $1 of ETH in the same wallet (a transaction costs about $0.01 to $0.05) |
+| NEAR gas for step 3 | about 0.1 NEAR (about $0.40) |
+| **Total at risk** | **about $5, never more than the $10 cap** |
 
 ## What the README may say afterwards
 
@@ -57,5 +58,5 @@ Only what the transaction hashes show. If step 3 succeeds: "NEAR USDC to Base US
 ## What the owner needs
 
 - A bank account in a country Switch covers (Switch lists 18 countries for our key), if using step 1.
-- A Base wallet address (a public address only, for example from MetaMask or Coinbase Wallet).
+- A Base wallet address (a public address only, for example from MetaMask or Coinbase Wallet), holding about $1 of ETH on Base for the network fee of step 2. Switch sends only USDC, so the ETH has to come from elsewhere.
 - A mainnet NEAR account with about 0.1 NEAR for gas (the owner's `goni19.near`).
