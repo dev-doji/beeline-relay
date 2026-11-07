@@ -1,4 +1,13 @@
-# Handoff: current state (5 Nov 2026)
+# Handoff: current state (7 Nov 2026)
+
+## Latest (7 Nov 2026): read this first
+
+- **Hosted:** website https://usebeeline.xyz (Vercel project devopsnormads-projects/beeline, root `beeline-web`); API https://beeline-api-z3tu.onrender.com (Render free plan, `render.yaml`, sleeps after ~15 min idle); database Neon. Secrets live only in the Render dashboard; `scripts/hosting-env.ps1` prints them locally. See `docs/DEPLOY.md`.
+- **Product direction (owner, 7 Nov):** no canned "simulate" buttons. The core demo is **dare-a-friend pay links**: a vendor creates a signed invoice (`/vendor`), sends the link to anyone, and visitors attack it on `/pay/[id]` with free text and/or an edited payee or amount. Bee (NEAR AI) decides, and the vault decides on-chain. Every attempt goes to the public attack log (`/attacks`, `GET /api/v1/playground/attempts`, migration 0004) with computed totals, including "paid to the wrong account".
+- **SDK:** `packages/beeline-sdk` (`invoices.create/get/pay/attempts`, `attackLog`, `verify` via NEAR RPC). `pnpm test` has 5 unit tests; `pnpm example` runs live on testnet (verified against the hosted API on 7 Nov). **Not published to npm**: that needs the owner's npm account (`beeline-sdk` was free on 7 Nov).
+- **Switch (onswitch.xyz):** the owner has an API key and was asked to add `SWITCH_API_KEY` and `SWITCH_MODE` (sandbox or live) to `beeline-api/.env` (never in chat). Switch onramps local currency (21 African countries) to USDC on EVM chains, Solana and Tron, **not NEAR**. Plan: onramp to a NEAR Intents (1Click) deposit address that delivers into the vault. A sandbox key only simulates settlement; label it as such. Not started.
+- **NEAR Intents mainnet payout:** still one small live payment away (USDC on 16 chains per the 1Click token list on 7 Nov).
+
 
 For any coding agent continuing this project (Antigravity, Codex, Claude Code). Read `AGENTS.md` first, then `docs/HACKATHON_PLAN.md`. The **v4 block** at the top of the plan is the current direction and overrides older sections.
 
