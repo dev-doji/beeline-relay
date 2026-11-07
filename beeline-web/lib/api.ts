@@ -245,3 +245,31 @@ export const getAttackLog = () => request<{ data: Attempt[]; stats: AttackStats 
 export function invoiceIdFromText(text: string): string | null {
   return text.match(/\/pay\/(inv_[a-z0-9]{10,40})/i)?.[1] ?? null;
 }
+
+/* ---------------- Funding preview (Switch, quotes only) ---------------- */
+
+export interface FundCorridor {
+  country: string; // ISO 3166-1 alpha-2
+  currency: string[];
+  default_channel: "BANK" | "MOBILEMONEY";
+  channel: ("BANK" | "MOBILEMONEY")[];
+  settlement_time: Record<string, string>;
+  payout_limit: Record<string, { min?: string; max?: string } | string>;
+}
+
+export interface FundQuote {
+  expiry: string;
+  settlement: string;
+  channel: string;
+  rate: number;
+  source: { amount: number; amount_usd: number; currency: string; network: string };
+  destination: { amount: number; amount_usd: number; currency: string; network: string };
+}
+
+export const getFundCoverage = () => request<{ mode: "live" | "sandbox"; data: FundCorridor[] }>("/api/v1/fund/coverage");
+
+export const getFundQuote = (input: { country: string; amount: number; channel?: string }) =>
+  request<{ mode: "live" | "sandbox"; note: string; data: FundQuote }>("/api/v1/fund/quote", {
+    method: "POST",
+    body: JSON.stringify({ ...input, asset: "base:usdc" }),
+  });

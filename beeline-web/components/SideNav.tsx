@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Github, Landmark, MessagesSquare, Radar, Store, X } from "lucide-react";
+import { Activity, Banknote, Github, Landmark, MessagesSquare, Radar, Store, X } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { type PlaygroundState, REPO_URL, formatUSDC } from "@/lib/api";
 
@@ -13,7 +13,7 @@ export function SideNav({
   onNewChat,
   children,
 }: {
-  active: "chat" | "monitor" | "vendor" | "attacks";
+  active: "chat" | "monitor" | "vendor" | "attacks" | "fund";
   state: PlaygroundState | null;
   onClose: () => void;
   onNewChat?: () => void;
@@ -31,6 +31,9 @@ export function SideNav({
       </div>
       <Link className={`side-item ${active === "vendor" ? "active" : ""}`} href="/vendor">
         <Store size={18} aria-hidden /> Create a pay link
+      </Link>
+      <Link className={`side-item ${active === "fund" ? "active" : ""}`} href="/fund">
+        <Banknote size={18} aria-hidden /> Fund with local currency
       </Link>
       <Link className={`side-item ${active === "attacks" ? "active" : ""}`} href="/attacks">
         <Activity size={18} aria-hidden /> Attack log
