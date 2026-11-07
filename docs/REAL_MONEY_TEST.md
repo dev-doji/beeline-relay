@@ -22,6 +22,15 @@ Two things in the README are still unproven because they need real money:
 **Step 1: get a few dollars of USDC (real naira through Switch).**
 Pay about 4,500 NGN by bank transfer (about $3.25 at the 2026-11-07 rate of 1,382.76 NGN per USD; Nigeria's minimum is $1) and receive about 3 USDC on **Base**, at the owner's own Base wallet address. Switch gives a one-time bank account valid for 30 minutes and an exact amount to send. This is the only step that needs a local bank account. If the owner already holds USDC, skip it.
 
+How to run it (on your own PC; the Switch key is typed at a hidden prompt and never saved):
+
+```powershell
+.\scripts\switch-onramp.ps1 -BaseAddress 0xYourBaseAddress -HolderName "Your Name" -QuoteOnly   # see the quote, buy nothing
+.\scripts\switch-onramp.ps1 -BaseAddress 0xYourBaseAddress -HolderName "Your Name" -AmountNGN 4500
+```
+
+The script asks for two confirmations (the last 6 characters of your address, then the word `BUY`) before it asks Switch for a bank account. It caps each run at USD 10, then watches the status until the USDC arrives. It was tested only against a fake Switch server (quote only, a wrong confirmation, and the full path); it has not talked to the real Switch payment endpoints yet. Switch's compliance checks for a real payer are not documented, so expect that the first real run may ask for something we haven't seen.
+
 **Step 2: bring USDC from Base to NEAR.**
 A 1Click quote, Base USDC to NEAR USDC (a dry quote worked on 2026-11-05 with `recipientType: INTENTS`). The owner sends from their Base wallet to the quoted deposit address. Expected loss: well under 1%.
 

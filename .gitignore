@@ -34,3 +34,6 @@ Thumbs.db
 
 # Demo recordings (local only)
 demo/
+
+# Real-money test logs (no keys, but bank and wallet details)
+.realmoney/
