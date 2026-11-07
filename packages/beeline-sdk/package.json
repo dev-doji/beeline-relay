@@ -1,0 +1,28 @@
+{
+  "name": "beeline-sdk",
+  "version": "0.1.0",
+  "description": "Guarded pay links and AI-agent payments on NEAR: the Beeline vault pays only the signed payee and amount, once, whatever the agent was told.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=18" },
+  "keywords": ["near", "ai-agents", "payments", "security", "prompt-injection", "invoices", "near-intents"],
+  "repository": { "type": "git", "url": "git+https://github.com/dev-doji/beeline-relay.git", "directory": "packages/beeline-sdk" },
+  "homepage": "https://usebeeline.xyz",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test test/sdk.test.mjs",
+    "example": "tsc -p tsconfig.json && node examples/dare.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}

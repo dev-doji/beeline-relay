@@ -95,6 +95,26 @@ jobs:
       - name: build
         run: pnpm build
 
+  sdk:
+    name: SDK (beeline-sdk)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/beeline-sdk
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: packages/beeline-sdk/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: build and unit tests
+        run: pnpm test
+
   container:
     name: API container
     runs-on: ubuntu-latest
