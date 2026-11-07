@@ -21,14 +21,14 @@ export function SiteHeader() {
           <i /><i /><i /><i /><i />
         </span>
         <nav className="pnav-links" aria-label="Main">
-          <Link href="/playground">Playground</Link>
-          <Link href="/monitor">Monitor</Link>
-          <Link href="/vendor">Vendors</Link>
+          <Link href="/vendor">Pay links</Link>
+          <Link href="/attacks">Attack log</Link>
+          <a href="#track">Track</a>
           <a href={REPO_URL} target="_blank" rel="noreferrer">
             GitHub
           </a>
         </nav>
-        <Link href="/playground" className="pbtn dark small pnav-cta">
+        <Link href="/vendor" className="pbtn dark small pnav-cta">
           Launch app <ArrowRight size={15} aria-hidden />
         </Link>
       </div>
