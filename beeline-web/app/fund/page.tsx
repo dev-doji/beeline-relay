@@ -1,9 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowRight, Banknote, Info, Landmark, Smartphone } from "lucide-react";
+import { ArrowDown, ArrowRight, Banknote, Info, Landmark, Smartphone, Wallet } from "lucide-react";
 import { AppFrame } from "@/components/AppFrame";
 import { ApiError, type FundCorridor, type FundQuote, getFundCoverage, getFundQuote } from "@/lib/api";
+
+// Privy (email sign-in and an embedded Base wallet) loads only here, and only when an App ID is configured.
+const PRIVY_ON = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
+const PrivyWalletPanel = dynamic(() => import("@/components/fund/PrivyWalletPanel"), {
+  ssr: false,
+  loading: () => <div className="panel wallet-card">Loading wallet…</div>,
+});
 
 const NAMES: Record<string, string> = {
   NG: "Nigeria", GH: "Ghana", KE: "Kenya", CD: "DR Congo", UG: "Uganda", CI: "Côte d’Ivoire", SN: "Senegal", RW: "Rwanda",
@@ -156,6 +164,20 @@ export default function FundPage() {
                 <p className="q-empty">Your live quote appears here.</p>
               )}
             </div>
+
+            {PRIVY_ON ? (
+              <PrivyWalletPanel />
+            ) : (
+              <div className="panel wallet-card">
+                <h2>
+                  <Wallet size={18} aria-hidden style={{ verticalAlign: "-3px" }} /> Your Base wallet
+                </h2>
+                <p className="wallet-note">
+                  Email sign-in with an automatic Base wallet (Privy) is built into this page but not switched on for this deployment yet. Until it is,
+                  use any wallet that supports Base.
+                </p>
+              </div>
+            )}
 
             <div className="panel route">
               <h2>The route</h2>

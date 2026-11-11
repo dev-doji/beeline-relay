@@ -40,6 +40,10 @@ From the owner's own mainnet NEAR account, with no contract deployed: get a real
 **Step 4 (optional, only if step 3 succeeds): a mainnet vault.**
 Deploying the vault contract to mainnet locks roughly 4 to 5 NEAR as storage (the contract is about 0.5 MB, and NEAR locks about 1 NEAR per 100 KB), about $15 to $20 at today's $3.64 per NEAR. It is returned if the account is deleted. This is **not recommended before the hackathon deadline**: step 3 already proves the mechanism, and the README can say plainly that the vault itself was only deployed on testnet.
 
+## Variant: use the Privy wallet instead of MetaMask (step 1 and 2)
+
+If the Privy panel on `/fund` is switched on (docs/DEPLOY.md), sign in there with an email and use the wallet it shows as `-BaseAddress` in step 1. For step 2, the panel's **Send USDC** box sends from that wallet with the fee requested as sponsored, so no ETH is needed, provided Privy credits are bought for the app (otherwise the send fails and nothing moves). The send box is capped at 10 USDC, rejects addresses with a wrong checksum, and needs the last 6 characters of the recipient typed to confirm. Not yet tried with a real Privy app.
+
 ## Cost estimate
 
 | Item | About |

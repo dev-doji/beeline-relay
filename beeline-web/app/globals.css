@@ -812,3 +812,15 @@ pre.answer { font-size: 11.5px; padding: 10px; }
 
 /* Two-column pages (vendor, fund) stack on tablets and phones; this must come after the compact-scale .split rule. */
 @media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Wallet panel (Privy) ---------- */
+.wallet-card { display: grid; gap: 10px; }
+.wallet-card h2 { margin: 0; }
+.wallet-note { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.wallet-note code { font-size: 11.5px; background: var(--bg-2); padding: 1px 5px; border-radius: 6px; }
+.wallet-bal { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.wallet-bal b { font-family: var(--display); font-size: 26px; letter-spacing: -0.03em; }
+.wallet-bal small { color: var(--muted); font-weight: 600; }
+.wallet-bal a { margin-left: auto; font-size: 12px; color: var(--real); text-decoration: none; display: inline-flex; gap: 3px; align-items: center; }
+.send-box { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.send-box h3 { margin: 0; font-size: 14px; display: flex; gap: 7px; align-items: center; }
