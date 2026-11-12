@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { QRCodeSVG } from "qrcode.react";
-import { ArrowRight, Check, Copy, ExternalLink, MessageCircle, Plus, Store, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Plus, Store, Trash2 } from "lucide-react";
+import { ShareLink } from "@/components/invoice/ShareLink";
 import { Receipt, lineTotal } from "@/components/invoice/Receipt";
 import { AppFrame } from "@/components/AppFrame";
-import { ApiError, type Invoice, type InvoiceItem, createInvoice, getPlayground, toBaseUnits } from "@/lib/api";
+import { ApiError, type Invoice, type InvoiceItem, createInvoice, formatUSDC, getPlayground, toBaseUnits } from "@/lib/api";
 
 interface DraftItem {
   name: string;
@@ -43,7 +42,6 @@ export default function VendorPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Invoice | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const parsed: (InvoiceItem | null)[] = items.map((it) => {
     const units = toBaseUnits(it.price);
@@ -94,10 +92,10 @@ export default function VendorPage() {
         <span className="pill pill-honey">
           <Store size={13} aria-hidden /> Step 1 of 2 · NEAR testnet
         </span>
-        <h1>Create a pay link. Then dare someone to steal it.</h1>
+        <h1>Create a payment link. Share it anywhere.</h1>
         <p>
-          Beeline signs your invoice. Send the link to anyone and let them try to trick the AI agent that pays it, with their own
-          words or an edited link. Every attempt is public and decided on-chain.
+          Online or in the shop: Beeline signs your invoice, you send the link on any app or show the QR at the counter, and the
+          customer pays in USDC. Every payment is tracked, and the vault blocks anything that doesn’t match the signed invoice.
         </p>
       </div>
 
@@ -163,7 +161,7 @@ export default function VendorPage() {
             </div>
           )}
           <button className="btn btn-honey" onClick={() => void submit()} disabled={!valid || !payoutOk || overCap || busy}>
-            {busy ? "Signing your invoice…" : "Create pay link"} <ArrowRight size={18} aria-hidden />
+            {busy ? "Signing your invoice…" : "Create payment link"} <ArrowRight size={18} aria-hidden />
           </button>
         </div>
 
@@ -185,40 +183,9 @@ export default function VendorPage() {
           {created && (
             <div className="panel" style={{ animation: "rise .45s var(--ease-out) both" }}>
               <h2>
-                <Check size={18} color="var(--ok)" aria-hidden style={{ verticalAlign: "-3px" }} /> Step 2: send it to someone and dare them
+                <Check size={18} color="var(--ok)" aria-hidden style={{ verticalAlign: "-3px" }} /> Step 2: send it to your customer
               </h2>
-              <div className="share">
-                <div className="qr" aria-label="QR code for the pay link">
-                  <QRCodeSVG value={link} size={112} level="M" />
-                </div>
-                <div style={{ display: "grid", gap: 10, minWidth: 0, width: "100%" }}>
-                  <div className="linkbox">
-                    <code>{link}</code>
-                    <button
-                      className="icon-btn"
-                      aria-label="Copy link"
-                      onClick={() => {
-                        void navigator.clipboard?.writeText(link);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 1500);
-                      }}
-                    >
-                      {copied ? <Check size={16} /> : <Copy size={16} />}
-                    </button>
-                  </div>
-                  <div className="actions">
-                    <Link className="btn btn-honey" href={`/pay/${created.id}`}>
-                      Open it and try yourself <ExternalLink size={16} aria-hidden />
-                    </Link>
-                    <a className="btn" href={`https://wa.me/?text=${encodeURIComponent(dare(vendor, link))}`} target="_blank" rel="noreferrer">
-                      <MessageCircle size={16} aria-hidden /> WhatsApp
-                    </a>
-                    <a className="btn" href={`https://x.com/intent/post?text=${encodeURIComponent(dare(vendor, link))}`} target="_blank" rel="noreferrer">
-                      Post on X
-                    </a>
-                  </div>
-                </div>
-              </div>
+              <ShareLink id={created.id} link={link} vendor={vendor} amountLabel={`${formatUSDC(total)} USDC`} dareText={dare(vendor, link)} />
             </div>
           )}
         </div>

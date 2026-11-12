@@ -39,19 +39,6 @@ Open the website, go to **Monitor**, add a request and press **Run monitor**.
 
 ---
 
-## Optional: switch on email wallets (Privy)
-
-This turns on "Sign in with email" and an automatic Base wallet on the `/fund` page. Without it, the page says the feature is not switched on, and nothing else changes.
-
-1. Sign up at **dashboard.privy.io** (the free plan covers up to 499 monthly active users) and create an app for the **web**.
-2. Copy the **App ID**. It is public, not a secret.
-3. In the app's settings:
-   - **Login methods:** enable **Email** only.
-   - **Embedded wallets:** enable **Ethereum**, created automatically on login.
-   - **Allowed origins / domains:** add `https://usebeeline.xyz` and `https://www.usebeeline.xyz` (and `http://localhost:3001` for local testing). If this is missing, the page shows "Sign-in could not start".
-4. For free-of-ETH sends, open **Fee sponsorship**: turn on **Sponsor gas fees**, add **Base**, and make sure the app uses **TEE execution** (Privy requires it for sponsorship). Prepaid accounts need a saved payment method and bought credits (Privy publishes no rate). A few dollars of credits is plenty for testing. Without this, sends fail and nothing moves, and the wallet can still receive USDC.
-5. In **Vercel** (project settings, Environment Variables), add `NEXT_PUBLIC_PRIVY_APP_ID` with the App ID, then redeploy.
-
 ## Good to know
 
 - **Free-plan sleep:** Render's free services sleep after about 15 minutes without visits. The first visit after that takes about a minute to wake up; after that it's fast. Before judging or recording, open the site once to wake it.

@@ -4,9 +4,9 @@ import { SiteHeader } from "@/components/SiteHeader";
 
 
 export const metadata: Metadata = {
-  title: "Beeline: invoice links for vendors, paid on NEAR",
+  title: "Beeline: point of sale on NEAR, with fraud blocked on-chain",
   description:
-    "Vendors send signed pay links; customers or their AI agents pay in USDC through NEAR Intents. A NEAR vault pays only the exact vendor and amount, with limits and a TEE-signed AI reviewer checked on-chain.",
+    "Create an invoice, share the link on any app or show the QR at the counter, and get paid in USDC on NEAR. Every payment is tracked, and a NEAR vault blocks anything that does not match the signed invoice.",
 };
 
 export const viewport: Viewport = { themeColor: "#f7f7fa", width: "device-width", initialScale: 1 };

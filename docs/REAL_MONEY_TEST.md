@@ -1,3 +1,5 @@
+> **PARKED (2026-11-12).** The owner decided Beeline is payments only, so Switch funding was removed and the scripts this plan relies on (`switch-wallet.ps1`, `switch-onramp.ps1`) were deleted. Kept for the NEAR Intents findings only. No real money has moved.
+
 # Real-money test plan (not run yet)
 
 Status: **plan only. No real money has moved in this project.** Written 2026-11-07. Everything else in the README ran on NEAR testnet with test USDC.

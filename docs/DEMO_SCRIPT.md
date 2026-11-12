@@ -34,11 +34,12 @@ Record on the **live site, https://usebeeline.xyz** (not localhost). Everything 
 
 ## 3. A real pay link (0:40 – 1:00)
 
-**Screen:** click **Create a pay link**. Keep the MS Clothing example and the shop's NEAR testnet account. Click **Create pay link**. Show the link and the QR code.
+**Screen:** click **Create a payment link**. Keep the MS Clothing example and the shop's NEAR testnet account. Click **Create payment link**. Show the share buttons (WhatsApp, Facebook, X, Telegram, LinkedIn, email, SMS), then click **Show QR at the counter** to show the in-person version.
 
 **Voiceover:**
-> A vendor creates an invoice, and Beeline signs it: who gets paid, and how much.
-> This link can be sent to anyone. So let's send it to someone who wants to steal.
+> A business creates an invoice, and Beeline signs it: who gets paid, and how much.
+> Share it on any app, or show this QR at the counter in the shop. Every payment is tracked.
+> Now let's send the link to someone who wants to steal.
 
 ## 4. A stranger attacks it (1:00 – 2:00)
 
@@ -81,7 +82,7 @@ Then try a second attack: change the **amount** on the link to `4.5`, add a "pri
 
 **Voiceover:**
 > A NEAR smart contract with 76 tests, a NEAR AI agent, and a reviewer that signs its answers in a trusted environment, which the contract verifies on-chain. All open source.
-> Next: real money through NEAR Intents, and funding in local currency.
+> Next: money from other chains, through NEAR Intents.
 > Beeline. Your AI agent can be tricked. Its wallet can't.
 
 ---
@@ -89,7 +90,6 @@ Then try a second attack: change the **amount** on the link to `4.5`, add a "pri
 ### Optional shots (only if they are true on the day)
 
 - **Real-money proof:** include it only if the transaction hashes are in the README (see `docs/REAL_MONEY_TEST.md`). Otherwise say nothing about mainnet payments.
-- **Funding in naira:** on `/fund`, show the live Switch quote. Say plainly that it is a quote: "this is a live price for funding in naira; the bridge is next." Do not say money moved.
 - **Friends attacking:** if you send the link to friends before recording, their attempts will be in the log. Say "friends tried it" only if they did.
 
 ## Before recording (checklist)

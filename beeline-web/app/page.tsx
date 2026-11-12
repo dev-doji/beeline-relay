@@ -20,11 +20,12 @@ const proof = [
 
 const SDK_URL = "https://github.com/dev-doji/beeline-relay/tree/main/packages/beeline-sdk";
 
-// Honest status per route (README status table, docs/NEAR_INTENTS_ROUTE.md 6c, docs/REAL_MONEY_TEST.md).
+// Honest status (README status table, docs/NEAR_INTENTS_ROUTE.md 6c).
 const routes = [
+  { name: "Share on any app", state: "Live", note: "WhatsApp, Facebook, X, Telegram, LinkedIn, email, SMS, or the phone share sheet" },
+  { name: "QR at the counter", state: "Live", note: "full-screen and printable, for in-person sales" },
   { name: "USDC on NEAR to the vendor", state: "Live on testnet", note: "real test transactions, verified on-chain" },
-  { name: "USDC on Base, bridged by NEAR Intents", state: "Live quote", note: "dry quotes 2026-11-12; funded run not done yet" },
-  { name: "Naira funding through Switch", state: "Live quote", note: "price only; no money moved yet" },
+  { name: "Money from Base, bridged by NEAR Intents", state: "Live quote", note: "dry quotes 2026-11-12; funded run not done yet" },
 ];
 
 const threats = [
@@ -117,24 +118,24 @@ export default function Home() {
       <section className="lp-wrap lp-hero">
         <div className="lp-hero-text">
           <p className="cap rise" style={{ animationDelay: "0ms" }}>
-            vendor pay links
+            point of sale
             <br />
-            on NEAR Intents
+            for any business
           </p>
           <h1 className="rise" style={{ animationDelay: "80ms" }}>
-            <span className="line">Invoice anyone.</span>
+            <span className="line">Sell anywhere.</span>
             <span className="line">Get paid on <mark>NEAR.</mark></span>
-            <span className="line l-ghost">No trick reroutes it.</span>
+            <span className="line l-ghost">Fraud gets blocked.</span>
           </h1>
           <p className="rise" style={{ animationDelay: "140ms", maxWidth: 460 }}>
-            A vendor sends a signed pay link. The customer, or their AI agent, pays in USDC. A NEAR vault pays only the exact vendor and amount on the invoice.
+            Online or in the shop: create an invoice, share the link on any app or show the QR at the counter. Customers pay in USDC, every payment is tracked, and a NEAR vault blocks anything that doesn’t match the signed invoice.
           </p>
           <div className="lp-cta rise" style={{ animationDelay: "200ms" }}>
             <Link href="/vendor" className="pbtn dark">
-              Create a pay link, dare a friend <ArrowRight size={17} aria-hidden />
+              Create a payment link <ArrowRight size={17} aria-hidden />
             </Link>
             <Link href="/attacks" className="pbtn">
-              See every attack
+              See the attack log
             </Link>
           </div>
 
@@ -204,11 +205,11 @@ export default function Home() {
       <section className="lp-wrap lp-sec" id="routes">
         <div className="sec-head">
           <h2>
-            Paid from
+            Online.
             <br />
-            <span className="l-ghost">where the customer is.</span>
+            <span className="l-ghost">In the shop.</span>
           </h2>
-          <p className="cap">what works today, and what is still a quote. no route here is labelled live unless a transaction proves it.</p>
+          <p className="cap">what works today, and what is still a quote. nothing here is labelled live unless it runs.</p>
         </div>
         <div className="proofs">
           {routes.map((r) => (
@@ -290,18 +291,18 @@ export default function Home() {
         <ol className="steps">
           <li>
             <span className="snum">1</span>
-            <h3>Vendor signs an invoice</h3>
-            <p>Who gets paid, and how much, signed. Share the link on WhatsApp, Instagram or email.</p>
+            <h3>Create an invoice</h3>
+            <p>Who gets paid, and how much, signed by Beeline.</p>
           </li>
           <li>
             <span className="snum">2</span>
-            <h3>Customer or agent pays</h3>
-            <p>USDC from the customer’s wallet or their AI agent. Dare a friend to trick it: every attempt lands in the public attack log.</p>
+            <h3>Share it anywhere</h3>
+            <p>Any social app, a DM, email, or a QR at the counter. The customer, or their AI agent, pays in USDC.</p>
           </li>
           <li>
             <span className="snum">3</span>
-            <h3>The vault decides</h3>
-            <p>On-chain, in public. Only the exact vendor and amount are paid, once.</p>
+            <h3>Tracked and protected</h3>
+            <p>The vault pays only the exact payee and amount, once. Every attempt, paid or blocked, is in the public log.</p>
           </li>
         </ol>
       </section>
