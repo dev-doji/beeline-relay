@@ -60,6 +60,13 @@ export default function VendorPage() {
 
   const link = created && typeof window !== "undefined" ? `${window.location.origin}/pay/${created.id}` : "";
 
+  // The permanent link carries the payee in its address; each payer who opens it gets a fresh,
+  // single-use signed invoice for the amount they choose.
+  const permanent =
+    payoutOk && typeof window !== "undefined"
+      ? `${window.location.origin}/pay/to?${new URLSearchParams({ name: vendor.trim() || payout, to: payout }).toString()}`
+      : "";
+
   async function submit() {
     if (!valid || !payoutOk || overCap || busy) return;
     setBusy(true);
@@ -166,6 +173,16 @@ export default function VendorPage() {
         </div>
 
         <div style={{ display: "grid", gap: 16, position: "sticky", top: 16 }}>
+          {permanent && (
+            <div className="panel">
+              <h2>Or: one permanent link</h2>
+              <p className="help">
+                For a freelancer or a shop that wants a single link for good. The customer chooses the amount, and Beeline signs a new
+                one-time invoice for each payment, so the vault still pays only that payee and amount, once.
+              </p>
+              <ShareLink id="" link={permanent} vendor={vendor.trim() || payout} amountLabel="" dareText={dare(vendor, permanent)} />
+            </div>
+          )}
           <Receipt
             data={{
               id: created?.id,

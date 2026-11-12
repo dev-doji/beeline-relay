@@ -20,7 +20,7 @@ export function ShareLink({
   id: string;
   link: string;
   vendor: string;
-  /** e.g. "0.20 USDC" */
+  /** e.g. "0.20 USDC"; empty for a permanent link where the payer chooses the amount (then `id` is empty too). */
   amountLabel: string;
   dareText: string;
 }) {
@@ -39,7 +39,11 @@ export function ShareLink({
     return () => window.removeEventListener("keydown", onKey);
   }, [counter]);
 
-  const text = dare ? dareText : `Pay ${vendor} ${amountLabel} here (signed invoice, paid on NEAR):`;
+  const text = dare
+    ? dareText
+    : amountLabel
+      ? `Pay ${vendor} ${amountLabel} here (signed invoice, paid on NEAR):`
+      : `Pay ${vendor} here, any amount (Beeline signs a one-time invoice, paid on NEAR):`;
   const full = `${text} ${link}`;
   const q = encodeURIComponent;
   const targets: { name: string; href: string }[] = [
@@ -73,7 +77,7 @@ export function ShareLink({
         {canNative && (
           <button
             className="btn btn-honey"
-            onClick={() => void navigator.share({ title: `${vendor}: ${amountLabel}`, text, url: link }).catch(() => undefined)}
+            onClick={() => void navigator.share({ title: amountLabel ? `${vendor}: ${amountLabel}` : `Pay ${vendor}`, text, url: link }).catch(() => undefined)}
           >
             <Share2 size={16} aria-hidden /> Share…
           </button>
@@ -98,7 +102,7 @@ export function ShareLink({
       </span>
 
       <div className="actions">
-        <Link className="btn btn-honey" href={`/pay/${id}`}>
+        <Link className="btn btn-honey" href={id ? `/pay/${id}` : link}>
           Open the pay page <ExternalLink size={16} aria-hidden />
         </Link>
         <button className="btn ghost" onClick={() => setDare((d) => !d)}>
@@ -113,7 +117,7 @@ export function ShareLink({
               <X size={18} />
             </button>
             <h2>{vendor}</h2>
-            <p className="counter-amt">{amountLabel}</p>
+            <p className="counter-amt">{amountLabel || "Scan to pay"}</p>
             <QRCodeSVG value={link} size={280} level="M" />
             <p className="help">Scan with a phone camera to pay. Signed invoice, paid on NEAR.</p>
             <button className="btn" onClick={() => window.print()}>

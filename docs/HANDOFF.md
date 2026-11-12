@@ -55,3 +55,5 @@ The owner is non-technical. They make product decisions, and the agent makes the
 - PowerShell 5.1 mangles JSON passed to native programs. Use `file-args` with the near CLI. Use `gh secret set --body` (piping corrupts values).
 - The dev PC clock is about 27s off. The API uses its own clock in UTC.
 - 1Click has no testnet. Its `refundTo` must be an existing NEAR account.
+
+- **Permanent pay link added 2026-11-12** (`beeline-web/app/pay/to`, panel on `/vendor`). Stateless: the payee and shop name travel in the URL and each payer's amount creates a normal one-time invoice through `POST /playground/invoices`. No handles table yet (deliberate for the MVP), so the link is unsigned; a handle registry with proof of NEAR account ownership is the next step.
