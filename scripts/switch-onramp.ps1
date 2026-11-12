@@ -11,19 +11,28 @@
   Nothing is ever signed with a private key here. USDC is sent by Switch to the Base address you give.
   A hard cap of USD 10 per run. Use -QuoteOnly to see the quote and stop.
 
+.PARAMETER WalletId
+  The id of a Switch wallet you created with scripts/switch-wallet.ps1 -Action Create (24 hex characters).
+  USDC is credited to that wallet. Switch wallets can send USDC onward with the fee paid in stablecoin,
+  so no ETH is needed. This is the recommended route for the real-money test.
+
 .PARAMETER BaseAddress
-  YOUR OWN wallet address on the BASE network (0x + 40 hex characters). A wrong address loses the money.
+  Alternative to -WalletId: YOUR OWN wallet address on the BASE network (0x + 40 hex characters).
+  A wrong address loses the money.
 
 .PARAMETER HolderName
-  Your name as the recipient label for the wallet.
+  With -BaseAddress only: your name as the recipient label for the wallet.
 
 .EXAMPLE
+  .\scripts\switch-onramp.ps1 -WalletId 0123456789abcdef01234567 -QuoteOnly
+  .\scripts\switch-onramp.ps1 -WalletId 0123456789abcdef01234567 -AmountNGN 4500
   .\scripts\switch-onramp.ps1 -BaseAddress 0xYourBaseAddress -HolderName "Your Name" -QuoteOnly
-  .\scripts\switch-onramp.ps1 -BaseAddress 0xYourBaseAddress -HolderName "Your Name" -AmountNGN 4500
 #>
+[CmdletBinding(DefaultParameterSetName = 'Wallet')]
 param(
-  [Parameter(Mandatory = $true)][string]$BaseAddress,
-  [Parameter(Mandatory = $true)][string]$HolderName,
+  [Parameter(ParameterSetName = 'Wallet', Mandatory = $true)][ValidatePattern('^[a-f0-9]{24}$')][string]$WalletId,
+  [Parameter(ParameterSetName = 'Address', Mandatory = $true)][string]$BaseAddress,
+  [Parameter(ParameterSetName = 'Address', Mandatory = $true)][string]$HolderName,
   [ValidateRange(1000, 20000)][decimal]$AmountNGN = 4500,
   [switch]$QuoteOnly,
   [string]$BaseUrl = 'https://api.onswitch.xyz'   # only changed by tests against a local fake server
@@ -34,8 +43,11 @@ $CapUsd = 10
 $Asset = 'base:usdc'
 $Country = 'NG'
 
-if ($BaseAddress -notmatch '^0x[0-9a-fA-F]{40}$') { throw 'BaseAddress must be 0x followed by 40 hex characters (an EVM address).' }
-if ($HolderName.Trim().Length -lt 2) { throw 'HolderName is required.' }
+$useWallet = $PSCmdlet.ParameterSetName -eq 'Wallet'
+if (-not $useWallet) {
+  if ($BaseAddress -notmatch '^0x[0-9a-fA-F]{40}$') { throw 'BaseAddress must be 0x followed by 40 hex characters (an EVM address).' }
+  if ($HolderName.Trim().Length -lt 2) { throw 'HolderName is required.' }
+}
 
 # --- the key: from the environment (tests) or typed hidden. Never written anywhere. ---
 $key = $env:SWITCH_API_KEY
@@ -74,20 +86,32 @@ if ($QuoteOnly) { Write-Host "`nQuote only: stopping here. Nothing was bought." 
 
 # --- 2. explicit confirmation ---
 Write-Host ''
-Write-Host 'USDC will be sent by Switch to:' -ForegroundColor Yellow
-Write-Host "  $BaseAddress   on the BASE network" -ForegroundColor Yellow
-Write-Host 'If this is not YOUR wallet, or not a Base address, the money is lost. Open your wallet and compare it character by character.'
-$tail = $BaseAddress.Substring($BaseAddress.Length - 6).ToLower()
-$c1 = Read-Host "Type the LAST 6 characters of your address ($tail) to confirm it"
-if ($c1.Trim().ToLower() -ne $tail) { throw 'Address confirmation did not match. Stopped. Nothing was bought.' }
+if ($useWallet) {
+  $dest = $WalletId
+  $baseAddr = ''
+  try { $baseAddr = (Call 'GET' "/wallet/$WalletId" $null).data.address.BASE } catch { Write-Host "  (could not read the wallet's address: $_)" }
+  Write-Host 'USDC will be credited by Switch to YOUR Switch wallet:' -ForegroundColor Yellow
+  Write-Host "  wallet id $WalletId" -ForegroundColor Yellow
+  if ($baseAddr) { Write-Host "  Base address $baseAddr" -ForegroundColor Yellow }
+  Write-Host 'This must be the wallet you created with scripts/switch-wallet.ps1. Check the id against what that script printed.'
+} else {
+  $dest = $BaseAddress
+  Write-Host 'USDC will be sent by Switch to:' -ForegroundColor Yellow
+  Write-Host "  $BaseAddress   on the BASE network" -ForegroundColor Yellow
+  Write-Host 'If this is not YOUR wallet, or not a Base address, the money is lost. Open your wallet and compare it character by character.'
+}
+$tail = $dest.Substring($dest.Length - 6).ToLower()
+$c1 = Read-Host "Type the LAST 6 characters ($tail) to confirm the destination"
+if ($c1.Trim().ToLower() -ne $tail) { throw 'Destination confirmation did not match. Stopped. Nothing was bought.' }
 $c2 = Read-Host ('Type BUY to ask Switch for a bank account to pay {0:N2} NGN into' -f $q.source.amount)
 if ($c2 -cne 'BUY') { throw 'Not confirmed. Stopped. Nothing was bought.' }
 
 # --- 3. initiate ---
 $ref = [guid]::NewGuid().ToString()
+$beneficiary = if ($useWallet) { @{ wallet = $WalletId } } else { @{ holder_type = 'INDIVIDUAL'; holder_name = $HolderName.Trim(); wallet_address = $BaseAddress } }
 $resp = Call 'POST' '/onramp/initiate' @{
   amount = $AmountNGN; country = $Country; asset = $Asset; channel = 'BANK'; reference = $ref
-  beneficiary = @{ holder_type = 'INDIVIDUAL'; holder_name = $HolderName.Trim(); wallet_address = $BaseAddress }
+  beneficiary = $beneficiary
 }
 $d = $resp.data
 if (-not $d -or -not $d.deposit) { throw 'Switch did not return a bank account to pay.' }
@@ -106,7 +130,7 @@ Write-Host ('  Reference     : {0}' -f $ref)
 $logDir = Join-Path (Split-Path -Parent $PSScriptRoot) '.realmoney'
 New-Item -ItemType Directory -Force $logDir | Out-Null
 $log = Join-Path $logDir "switch-onramp-$ref.json"
-@{ reference = $ref; wallet = $BaseAddress; amount_ngn = $AmountNGN; started = (Get-Date).ToString('o'); quote = $q; deposit = $dep } | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 $log
+@{ reference = $ref; destination = $dest; amount_ngn = $AmountNGN; started = (Get-Date).ToString('o'); quote = $q; deposit = $dep } | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 $log
 Write-Host "  (details saved to $log, which is git-ignored and holds no key)"
 
 # --- 4. watch ---
@@ -123,7 +147,7 @@ while ((Get-Date) -lt $deadline) {
     Write-Host ('DONE. Received {0} {1} on {2}.' -f $s.destination.amount, $s.destination.currency, $s.destination.network) -ForegroundColor Green
     if ($s.meta.hash) { Write-Host ('  Transaction: {0}' -f $s.meta.hash) }
     if ($s.meta.explorer_url) { Write-Host ('  Explorer   : {0}' -f $s.meta.explorer_url) }
-    Write-Host '  Tell Claude "step 1 done" and paste the transaction line above (it is public).'
+    Write-Host '  Tell Claude "step 1 done". Check the balance with: .\scripts\switch-wallet.ps1 -Action Balance -WalletId <id>'
     return
   }
   if ($s.status -eq 'FAILED') { throw "Switch reports FAILED for reference $ref. Do not pay again. Tell Claude the reference." }

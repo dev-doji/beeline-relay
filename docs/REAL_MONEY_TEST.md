@@ -19,20 +19,32 @@ Two things in the README are still unproven because they need real money:
 
 ## Steps
 
-**Step 1: get a few dollars of USDC (real naira through Switch).**
-Pay about 4,500 NGN by bank transfer (about $3.25 at the 2026-11-07 rate of 1,382.76 NGN per USD; Nigeria's minimum is $1) and receive about 3 USDC on **Base**, at the owner's own Base wallet address. Switch gives a one-time bank account valid for 30 minutes and an exact amount to send. This is the only step that needs a local bank account. If the owner already holds USDC, skip it.
-
-How to run it (on your own PC; the Switch key is typed at a hidden prompt and never saved):
+**Step 0: create a Switch wallet** (decided 2026-11-12).
+A Switch wallet holds USDC and **sends it to any address with the network fee paid in stablecoin: no ETH and no gas sponsorship to buy** (Switch's transfer endpoint: "No bridging, no swapping or gas tokens required"). That replaces the Privy and MetaMask routes for this test. The wallet's private key is returned by Switch only once; `switch-wallet.ps1` discards it without showing or saving it, and the wallet is controlled by the Switch service key (Switch can export the key with `POST /wallet/export`), so the service key must be protected like the wallet's key. Fine for a test of about $5, not for holding real balances.
 
 ```powershell
-.\scripts\switch-onramp.ps1 -BaseAddress 0xYourBaseAddress -HolderName "Your Name" -QuoteOnly   # see the quote, buy nothing
-.\scripts\switch-onramp.ps1 -BaseAddress 0xYourBaseAddress -HolderName "Your Name" -AmountNGN 4500
+.\scripts\switch-wallet.ps1 -Action Create        # prints the wallet id and its Base address
 ```
 
-The script asks for two confirmations (the last 6 characters of your address, then the word `BUY`) before it asks Switch for a bank account. It caps each run at USD 10, then watches the status until the USDC arrives. It was tested only against a fake Switch server (quote only, a wrong confirmation, and the full path); it has not talked to the real Switch payment endpoints yet. Switch's compliance checks for a real payer are not documented, so expect that the first real run may ask for something we haven't seen.
+**Step 1: get a few dollars of USDC (real naira through Switch).**
+Pay about 4,500 NGN by bank transfer (about $3.25 at the 2026-11-07 rate of 1,382.76 NGN per USD; Nigeria's minimum is $1) and receive about 3 USDC on **Base**, credited to the Switch wallet. Switch gives a one-time bank account valid for 30 minutes and an exact amount to send. This is the only step that needs a local bank account. If the owner already holds USDC, skip it.
+
+```powershell
+.\scripts\switch-onramp.ps1 -WalletId <wallet id> -QuoteOnly   # see the quote, buy nothing
+.\scripts\switch-onramp.ps1 -WalletId <wallet id> -AmountNGN 4500
+.\scripts\switch-wallet.ps1 -Action Balance -WalletId <wallet id>
+```
+
+Both scripts run on your own PC; the Switch key is typed at a hidden prompt and never saved. `switch-onramp.ps1` asks for two confirmations (the last 6 characters of the destination, then the word `BUY`) before it asks Switch for a bank account, caps each run at USD 10, and watches the status until the USDC arrives. They were tested only against a fake Switch server (quote only, wrong confirmations, the full paths, and that the fake private key never reaches the output or any file); they have not talked to the real Switch payment or wallet endpoints yet. Switch's compliance checks for a real payer are not documented, so expect that the first real run may ask for something we haven't seen.
 
 **Step 2: bring USDC from Base to NEAR.**
-A 1Click quote, Base USDC to NEAR USDC (a dry quote worked on 2026-11-05 with `recipientType: INTENTS`). The owner sends from their Base wallet to the quoted deposit address. Expected loss: well under 1%.
+A 1Click quote, Base USDC to NEAR USDC (a dry quote worked on 2026-11-05 with `recipientType: INTENTS`). The owner sends it from the Switch wallet to the quoted deposit address:
+
+```powershell
+.\scripts\switch-wallet.ps1 -Action Send -WalletId <wallet id> -Recipient <deposit address> -Amount 3
+```
+
+It shows the fee first and needs the last 6 characters of the recipient and the word `SEND`. Expected loss: well under 1%. **Open question:** with `recipientType: INTENTS` the USDC is credited inside `intents.near` to the owner's account, not as a USDC token balance on NEAR. Step 3 as written needs the token balance, so there may be one extra hop (an `ft_withdraw` from `intents.near`, which needs 1 yoctoNEAR and a little gas) or a dry quote may show a direct NEAR delivery works now (on 2026-11-05 it did not). To be settled with dry quotes before any money moves in step 2.
 
 **Step 3: the NEAR to Base payout, the one the vault depends on.**
 From the owner's own mainnet NEAR account, with no contract deployed: get a real 1Click quote for 1 USDC, NEAR to Base (`depositType: INTENTS`, `refundType: INTENTS`), then send one `ft_transfer_call` to `intents.near` with `msg` set to the quote's deposit address. The agent prepares the exact command. Then it polls the 1Click status until `SUCCESS`, `REFUNDED` or `FAILED`, and checks the Base transaction on the explorer. This is the same call shape the vault makes, so it verifies the mechanism. Needs about 0.1 NEAR on the owner's mainnet account for gas.
@@ -40,9 +52,9 @@ From the owner's own mainnet NEAR account, with no contract deployed: get a real
 **Step 4 (optional, only if step 3 succeeds): a mainnet vault.**
 Deploying the vault contract to mainnet locks roughly 4 to 5 NEAR as storage (the contract is about 0.5 MB, and NEAR locks about 1 NEAR per 100 KB), about $15 to $20 at today's $3.64 per NEAR. It is returned if the account is deleted. This is **not recommended before the hackathon deadline**: step 3 already proves the mechanism, and the README can say plainly that the vault itself was only deployed on testnet.
 
-## Variant: use the Privy wallet instead of MetaMask (step 1 and 2)
+## Optional: the Privy wallet
 
-If the Privy panel on `/fund` is switched on (docs/DEPLOY.md), sign in there with an email and use the wallet it shows as `-BaseAddress` in step 1. For step 2, the panel's **Send USDC** box sends from that wallet with the fee requested as sponsored, so no ETH is needed, provided Privy credits are bought for the app (otherwise the send fails and nothing moves). The send box is capped at 10 USDC, rejects addresses with a wrong checksum, and needs the last 6 characters of the recipient typed to confirm. Not yet tried with a real Privy app.
+The Privy panel on `/fund` (docs/DEPLOY.md) is not needed for this test. Its sponsored sends need Privy credits that the owner has not bought, so a send from it fails and moves nothing. It can still receive USDC.
 
 ## Cost estimate
 
@@ -51,9 +63,9 @@ If the Privy panel on `/fund` is switched on (docs/DEPLOY.md), sign in there wit
 | Naira to USDC through Switch | 4,500 NGN (about $3.25), plus Switch's spread |
 | Base to NEAR bridge fee | under $0.05 |
 | NEAR to Base payout fee | about $0.01 to $0.03 |
-| Gas on Base for step 2 (paid in ETH) | about $1 of ETH in the same wallet (a transaction costs about $0.01 to $0.05) |
+| Switch wallet send in step 2 | the fee Switch quotes (estimated in USD, paid in stablecoin; a few cents to start with, shown before you confirm) |
 | NEAR gas for step 3 | about 0.1 NEAR (about $0.40) |
-| **Total at risk** | **about $5, never more than the $10 cap** |
+| **Total at risk** | **about $4 to $5, never more than the $10 cap** |
 
 ## What the README may say afterwards
 
@@ -62,5 +74,5 @@ Only what the transaction hashes show. If step 3 succeeds: "NEAR USDC to Base US
 ## What the owner needs
 
 - A bank account in a country Switch covers (Switch lists 18 countries for our key), if using step 1.
-- A Base wallet address (a public address only, for example from MetaMask or Coinbase Wallet), holding about $1 of ETH on Base for the network fee of step 2. Switch sends only USDC, so the ETH has to come from elsewhere.
+- Your Switch service key, typed only into your own terminal (never into chat). No separate wallet or ETH is needed: the Switch wallet is created by the script.
 - A mainnet NEAR account with about 0.1 NEAR for gas (the owner's `goni19.near`).
