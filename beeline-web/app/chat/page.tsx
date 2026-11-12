@@ -139,7 +139,7 @@ export default function ChatPage() {
     }
   }
 
-  if (!ready) return <div className="chat-center"><p className="help">Loading…</p></div>;
+  if (!ready) return <div className="cx-center"><p className="help">Loading…</p></div>;
 
   if (!authenticated) {
     return (
@@ -216,28 +216,28 @@ export default function ChatPage() {
 
   const needsSetup = !profile || !profile.shop_name || !profile.near_account;
   return (
-    <div className="lp chat-shell">
-      <aside className="chat-side" aria-label="Your invoices">
-        <Link href="/" className="chat-brand" aria-label="Beeline home">
-          <span className="chat-logo"><BeeMark size={22} /></span> <span>Beeline</span>
+    <div className="lp cx-shell">
+      <aside className="cx-side" aria-label="Your invoices">
+        <Link href="/" className="cx-brand" aria-label="Beeline home">
+          <span className="cx-logo"><BeeMark size={22} /></span> <span>Beeline</span>
         </Link>
         <button className="pbtn dark" onClick={() => (setShowCash(false), input.current?.focus())}>
           <Plus size={15} aria-hidden /> New invoice
         </button>
-        <div className="chat-list">
+        <div className="cx-list">
           <span className="cap">your invoices</span>
           {invoices.length === 0 && <span className="help">None yet. Ask for one in the chat.</span>}
           {invoices.map((i) => (
-            <Link key={i.id} href={`/pay/${i.id}`} className="chat-inv">
+            <Link key={i.id} href={`/pay/${i.id}`} className="cx-inv">
               <span>{formatUSDC(i.amount)} USDC</span>
-              <span className={i.status === "paid" ? "tag ok" : "tag"}>{i.status === "paid" ? "Paid" : "Open"}</span>
+              <span className={i.status === "paid" ? "cx-tag ok" : "cx-tag"}>{i.status === "paid" ? "Paid" : "Open"}</span>
             </Link>
           ))}
         </div>
         <button className="pbtn" onClick={() => setShowCash((s) => !s)}>
           <Wallet size={15} aria-hidden /> Cash out to bank
         </button>
-        <div className="chat-user">
+        <div className="cx-user">
           <span title={email}>{email || "Signed in"}</span>
           {wallet && <span className="help" title={wallet}>Wallet {shortKey(wallet, 5)}</span>}
           <button className="pbtn small" onClick={() => void logout()}>
@@ -246,35 +246,35 @@ export default function ChatPage() {
         </div>
       </aside>
 
-      <section className="chat-main">
-        <header className="chat-top">
+      <section className="cx-main">
+        <header className="cx-top">
           <BeeAvatar />
           <div>
             <b>Bee</b>
-            <span className="chat-status">
+            <span className="cx-status">
               <i aria-hidden /> online · near testnet
             </span>
           </div>
         </header>
-        <div className="chat-scroll">
-          <div className="chat-col">
+        <div className="cx-scroll">
+          <div className="cx-col">
             {showCash && <CashOut />}
-            <div className="msg bot">
+            <div className="cx-msg bot">
               <BeeAvatar />
-              <div className="msg-body">
+              <div className="cx-body">
               <p>
                 Hi, I&apos;m Bee, your payment assistant{profile?.shop_name ? ` for ${profile.shop_name}` : ""}. Here is what I can do:
               </p>
-              <ul className="chat-caps">
+              <ul className="cx-caps">
                 {CAPABILITIES.map((c) => (
                   <li key={c}>{c}</li>
                 ))}
               </ul>
               <p>{needsSetup ? "Let's start: what is your shop or business name, and which NEAR account should receive the money? You can say \"use my wallet\" and I will use the wallet I created for you." : "What would you like to do?"}</p>
               {messages.length === 0 && (
-                <div className="chips">
+                <div className="cx-chips">
                   {EXAMPLES.map((e) => (
-                    <button key={e.text} className="chip" onClick={() => void send(e.text)}>
+                    <button key={e.text} className="cx-chip" onClick={() => void send(e.text)}>
                       <e.icon size={14} aria-hidden /> {e.text}
                     </button>
                   ))}
@@ -286,21 +286,21 @@ export default function ChatPage() {
               const inv = m.invoice_id ? byId.get(m.invoice_id) : undefined;
               const link = inv && typeof window !== "undefined" ? `${window.location.origin}/pay/${inv.id}` : "";
               return (
-                <div key={m.id} className={m.role === "user" ? "msg me" : "msg bot"}>
+                <div key={m.id} className={m.role === "user" ? "cx-msg me" : "cx-msg bot"}>
                   {m.role === "assistant" && <BeeAvatar />}
-                  <div className="msg-body">
+                  <div className="cx-body">
                   <p>{m.body.replace(PERMANENT, "").trim()}</p>
                   {m.role === "assistant" && PERMANENT.test(m.body) && typeof window !== "undefined" && (
-                    <div className="panel msg-card">
+                    <div className="panel cx-card">
                       <b>Your permanent pay link</b>
                       <ShareLink id="" link={`${window.location.origin}${m.body.match(PERMANENT)![0]}`} vendor={profile?.shop_name || "my shop"} amountLabel="" dareText="" />
                     </div>
                   )}
                   {inv && (
-                    <div className="panel msg-card">
-                      <div className="msg-card-top">
+                    <div className="panel cx-card">
+                      <div className="cx-card-top">
                         <b>{formatUSDC(inv.amount)} USDC</b>
-                        <span className={inv.status === "paid" ? "tag ok" : "tag"}>{inv.status === "paid" ? "Paid" : "Open"}</span>
+                        <span className={inv.status === "paid" ? "cx-tag ok" : "cx-tag"}>{inv.status === "paid" ? "Paid" : "Open"}</span>
                       </div>
                       <ShareLink id={inv.id} link={link} vendor={inv.vendor_name} amountLabel={`${formatUSDC(inv.amount)} USDC`} dareText={dare(inv.vendor_name, link)} />
                     </div>
@@ -310,10 +310,10 @@ export default function ChatPage() {
               );
             })}
             {busy && (
-              <div className="msg bot">
+              <div className="cx-msg bot">
                 <BeeAvatar />
-                <div className="msg-body">
-                  <span className="typing" role="status" aria-label="Bee is typing">
+                <div className="cx-body">
+                  <span className="cx-typing" role="status" aria-label="Bee is cx-typing">
                     <i /><i /><i />
                   </span>
                 </div>
@@ -323,7 +323,7 @@ export default function ChatPage() {
             <div ref={bottom} />
           </div>
         </div>
-        <form className="composer" onSubmit={(e) => (e.preventDefault(), void send(text))}>
+        <form className="cx-composer" onSubmit={(e) => (e.preventDefault(), void send(text))}>
           <textarea
             ref={input}
             value={text}
@@ -339,11 +339,11 @@ export default function ChatPage() {
               }
             }}
           />
-          <button className="send" type="submit" aria-label="Send" disabled={!text.trim() || busy}>
+          <button className="cx-send" type="submit" aria-label="Send" disabled={!text.trim() || busy}>
             <ArrowUp size={18} />
           </button>
         </form>
-        <p className="chat-foot">test usdc on near testnet, invoices up to 5 usdc. bee can make mistakes, but it cannot send or move money.</p>
+        <p className="cx-foot">test usdc on near testnet, invoices up to 5 usdc. bee can make mistakes, but it cannot cx-send or move money.</p>
       </section>
     </div>
   );
