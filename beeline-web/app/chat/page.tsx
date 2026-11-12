@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { useCreateWallet } from "@privy-io/react-auth/extended-chains";
-import { ArrowUp, LogOut, Plus, Wallet } from "lucide-react";
+import { ArrowRight, ArrowUp, Ban, FileText, Link2, ListChecks, LogOut, Plus, Store, Wallet } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
+import { Honeycomb } from "@/components/landing/Honeycomb";
 import { ShareLink } from "@/components/invoice/ShareLink";
 import { CashOut } from "@/components/invoice/CashOut";
 import {
@@ -21,7 +22,20 @@ import {
   shortKey,
 } from "@/lib/api";
 
-const EXAMPLES = ["Set up my shop", "Invoice 2 for logo design", "Give me a permanent pay link", "Show my invoices"];
+const EXAMPLES = [
+  { icon: Store, text: "Set up my shop" },
+  { icon: FileText, text: "Invoice 2 for logo design" },
+  { icon: Link2, text: "Give me a permanent pay link" },
+  { icon: ListChecks, text: "Show my invoices" },
+];
+
+function BeeAvatar() {
+  return (
+    <span className="bee-av" aria-hidden>
+      <BeeMark size={22} />
+    </span>
+  );
+}
 
 const CAPABILITIES = [
   "Set up your shop and the NEAR account that gets paid",
@@ -129,30 +143,89 @@ export default function ChatPage() {
 
   if (!authenticated) {
     return (
-      <div className="chat-center">
-        <div className="chat-signin">
-          <BeeMark size={44} />
-          <h1>Get paid, protected</h1>
-          <p>Sign in with your email. Beeline sets up your wallet, then you ask for an invoice in a chat and share the pay link on any app. A NEAR vault blocks anything that does not match the signed invoice.</p>
-          <button className="btn btn-honey" onClick={() => login({ loginMethods: ["email"] })}>Continue with email</button>
-          <span className="help">You get a one-time code by email. No password. <Link href="/vendor">Or make a link without an account</Link>.</span>
-        </div>
+      <div className="lp auth-lp">
+        <header className="lp-wrap pnav-shell">
+          <div className="pnav">
+            <Link href="/" className="pnav-logo" aria-label="Beeline home">
+              <BeeMark size={26} />
+            </Link>
+            <span className="pnav-name">Beeline</span>
+            <span className="pnav-line" aria-hidden>
+              <i /><i /><i /><i /><i />
+            </span>
+            <nav className="pnav-links" aria-label="Main">
+              <Link href="/attacks">Attack log</Link>
+              <Link href="/">Home</Link>
+            </nav>
+          </div>
+        </header>
+
+        <section className="lp-wrap lp-hero">
+          <div className="lp-hero-text">
+            <p className="cap rise">sign in with your email. no password.</p>
+            <h1 className="rise" style={{ animationDelay: "80ms" }}>
+              <span className="line">Ask Bee.</span>
+              <span className="line">Get paid <mark>safe.</mark></span>
+              <span className="line l-ghost">Fraud gets blocked.</span>
+            </h1>
+            <p className="auth-lead rise" style={{ animationDelay: "140ms" }}>
+              Tell Bee what to bill. It makes a signed invoice you can share on any app or show as a QR at the till, and a NEAR vault pays only the exact person and amount.
+            </p>
+            <div className="lp-cta rise" style={{ animationDelay: "200ms" }}>
+              <button className="pbtn dark" onClick={() => login({ loginMethods: ["email"] })}>
+                Continue with email <ArrowRight size={18} aria-hidden />
+              </button>
+              <Link href="/attacks" className="pbtn">See the attack log</Link>
+            </div>
+            <div className="auth-fine rise" style={{ animationDelay: "260ms" }}>
+              <span className="tag">one-time code by email</span>
+              <span className="tag">NEAR wallet created for you</span>
+              <span className="tag">test USDC on testnet</span>
+            </div>
+          </div>
+
+          <div aria-hidden>
+            <div className="lp-collage">
+              <div className="tile t-chat pop" style={{ animationDelay: "150ms" }}>
+                <span className="cap">you</span>
+                <p>invoice 25 for logo design</p>
+              </div>
+              <div className="tile t-art pop" style={{ animationDelay: "250ms" }}>
+                <Honeycomb />
+                <span className="art-word">bee</span>
+              </div>
+              <div className="tile t-review pop" style={{ animationDelay: "350ms" }}>
+                <span className="cap">bee made an invoice</span>
+                <span className="auth-invoice">25 USDC</span>
+                <span className="l-stamp ok">SIGNED</span>
+              </div>
+              <div className="tile t-block pop" style={{ animationDelay: "450ms" }}>
+                <span className="l-bigic"><Ban size={22} /></span>
+                <div>
+                  <b>Changed the amount?</b>
+                  <span className="mono">blocked by the vault</span>
+                </div>
+              </div>
+            </div>
+            <p className="cap auth-note">an example. your real invoices appear after you sign in.</p>
+          </div>
+        </section>
       </div>
     );
   }
 
   const needsSetup = !profile || !profile.shop_name || !profile.near_account;
   return (
-    <div className="chat-shell">
+    <div className="lp chat-shell">
       <aside className="chat-side" aria-label="Your invoices">
         <Link href="/" className="chat-brand" aria-label="Beeline home">
-          <BeeMark size={26} /> <b>Beeline</b>
+          <span className="chat-logo"><BeeMark size={22} /></span> <span>Beeline</span>
         </Link>
-        <button className="btn" onClick={() => (setShowCash(false), input.current?.focus())}>
+        <button className="pbtn dark" onClick={() => (setShowCash(false), input.current?.focus())}>
           <Plus size={15} aria-hidden /> New invoice
         </button>
         <div className="chat-list">
-          <span className="help">Your invoices</span>
+          <span className="cap">your invoices</span>
           {invoices.length === 0 && <span className="help">None yet. Ask for one in the chat.</span>}
           {invoices.map((i) => (
             <Link key={i.id} href={`/pay/${i.id}`} className="chat-inv">
@@ -161,23 +234,34 @@ export default function ChatPage() {
             </Link>
           ))}
         </div>
-        <button className="btn ghost" onClick={() => setShowCash((s) => !s)}>
+        <button className="pbtn" onClick={() => setShowCash((s) => !s)}>
           <Wallet size={15} aria-hidden /> Cash out to bank
         </button>
         <div className="chat-user">
           <span title={email}>{email || "Signed in"}</span>
           {wallet && <span className="help" title={wallet}>Wallet {shortKey(wallet, 5)}</span>}
-          <button className="btn ghost" onClick={() => void logout()}>
-            <LogOut size={15} aria-hidden /> Sign out
+          <button className="pbtn small" onClick={() => void logout()}>
+            <LogOut size={14} aria-hidden /> Sign out
           </button>
         </div>
       </aside>
 
       <section className="chat-main">
+        <header className="chat-top">
+          <BeeAvatar />
+          <div>
+            <b>Bee</b>
+            <span className="chat-status">
+              <i aria-hidden /> online · near testnet
+            </span>
+          </div>
+        </header>
         <div className="chat-scroll">
           <div className="chat-col">
             {showCash && <CashOut />}
             <div className="msg bot">
+              <BeeAvatar />
+              <div className="msg-body">
               <p>
                 Hi, I&apos;m Bee, your payment assistant{profile?.shop_name ? ` for ${profile.shop_name}` : ""}. Here is what I can do:
               </p>
@@ -190,16 +274,21 @@ export default function ChatPage() {
               {messages.length === 0 && (
                 <div className="chips">
                   {EXAMPLES.map((e) => (
-                    <button key={e} className="chip" onClick={() => void send(e)}>{e}</button>
+                    <button key={e.text} className="chip" onClick={() => void send(e.text)}>
+                      <e.icon size={14} aria-hidden /> {e.text}
+                    </button>
                   ))}
                 </div>
               )}
+              </div>
             </div>
             {messages.map((m) => {
               const inv = m.invoice_id ? byId.get(m.invoice_id) : undefined;
               const link = inv && typeof window !== "undefined" ? `${window.location.origin}/pay/${inv.id}` : "";
               return (
                 <div key={m.id} className={m.role === "user" ? "msg me" : "msg bot"}>
+                  {m.role === "assistant" && <BeeAvatar />}
+                  <div className="msg-body">
                   <p>{m.body.replace(PERMANENT, "").trim()}</p>
                   {m.role === "assistant" && PERMANENT.test(m.body) && typeof window !== "undefined" && (
                     <div className="panel msg-card">
@@ -216,10 +305,20 @@ export default function ChatPage() {
                       <ShareLink id={inv.id} link={link} vendor={inv.vendor_name} amountLabel={`${formatUSDC(inv.amount)} USDC`} dareText={dare(inv.vendor_name, link)} />
                     </div>
                   )}
+                  </div>
                 </div>
               );
             })}
-            {busy && <div className="msg bot"><p className="help">Making your invoice…</p></div>}
+            {busy && (
+              <div className="msg bot">
+                <BeeAvatar />
+                <div className="msg-body">
+                  <span className="typing" role="status" aria-label="Bee is typing">
+                    <i /><i /><i />
+                  </span>
+                </div>
+              </div>
+            )}
             {error && <div className="alert" role="alert">{error}</div>}
             <div ref={bottom} />
           </div>
@@ -244,7 +343,7 @@ export default function ChatPage() {
             <ArrowUp size={18} />
           </button>
         </form>
-        <p className="chat-foot">Test USDC on NEAR testnet. Invoices are capped at 5 USDC. I understand simple invoice requests, not general questions.</p>
+        <p className="chat-foot">test usdc on near testnet, invoices up to 5 usdc. bee can make mistakes, but it cannot send or move money.</p>
       </section>
     </div>
   );
