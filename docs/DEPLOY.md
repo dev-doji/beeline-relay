@@ -39,6 +39,10 @@ Open the website, go to **Monitor**, add a request and press **Run monitor**.
 
 ---
 
+## Optional: cash out to a bank (Switch)
+
+In the Render service's environment add `SWITCH_API_KEY` (from the Switch dashboard; never put it in git or chat) and `SWITCH_MODE` (`sandbox` or `live`, whichever the key is). Without the key the cash-out panel shows "not configured". With a `live` key the API still refuses to open payout sessions.
+
 ## Good to know
 
 - **Free-plan sleep:** Render's free services sleep after about 15 minutes without visits. The first visit after that takes about a minute to wake up; after that it's fast. Before judging or recording, open the site once to wake it.

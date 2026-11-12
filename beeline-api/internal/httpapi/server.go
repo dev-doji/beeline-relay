@@ -16,10 +16,12 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/apperr"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/playground"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/switchramp"
 )
 
 // Pinger reports whether a dependency is reachable. The database pool satisfies it.
@@ -53,6 +55,9 @@ type Deps struct {
 	Playground        *playground.Service
 	PlaygroundLimiter *RunLimiter
 	Invoices          *invoices.Service
+	// Switch (offramp to a bank) and Intents (route pricing) back the cash-out preview; nil disables it.
+	Switch  *switchramp.Client
+	Intents intents.Provider
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -85,6 +90,9 @@ func NewRouter(d Deps) http.Handler {
 		r.Post("/playground/invoices/{id}/pay", h.payInvoice)
 		r.Get("/playground/invoices/{id}/attempts", h.invoiceAttempts)
 		r.Get("/playground/attempts", h.attackLog)
+		r.Post("/cashout/quote", h.cashoutQuote)
+		r.Post("/cashout/start", h.cashoutStart)
+		r.Get("/cashout/{reference}", h.cashoutStatus)
 
 		r.Group(func(r chi.Router) {
 			r.Use(requireAuth(d.Auth, d.Logger))

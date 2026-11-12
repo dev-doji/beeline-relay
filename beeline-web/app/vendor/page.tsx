@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, Plus, Store, Trash2 } from "lucide-react";
 import { ShareLink } from "@/components/invoice/ShareLink";
+import { CashOut } from "@/components/invoice/CashOut";
 import { Receipt, lineTotal } from "@/components/invoice/Receipt";
 import { AppFrame } from "@/components/AppFrame";
 import { ApiError, type Invoice, type InvoiceItem, createInvoice, formatUSDC, getPlayground, toBaseUnits } from "@/lib/api";
@@ -183,6 +184,7 @@ export default function VendorPage() {
               <ShareLink id="" link={permanent} vendor={vendor.trim() || payout} amountLabel="" dareText={dare(vendor, permanent)} />
             </div>
           )}
+          <CashOut />
           <Receipt
             data={{
               id: created?.id,

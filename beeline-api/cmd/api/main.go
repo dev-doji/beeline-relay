@@ -29,6 +29,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/playground"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/storage"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/switchramp"
 )
 
 func main() {
@@ -93,6 +94,12 @@ func run() error {
 		log.Info("playground enabled", "vault", pgCfg.Vault, "live_ai", pg.Reviewer != nil, "invoice_issuer", inv.IssuerPublicKeyHex())
 	}
 
+	var sw *switchramp.Client
+	if key := os.Getenv("SWITCH_API_KEY"); key != "" {
+		sw = switchramp.New(os.Getenv("SWITCH_BASE_URL"), key, os.Getenv("SWITCH_MODE"))
+		log.Info("switch cash-out enabled", "mode", sw.Mode)
+	}
+
 	cat := catalog.Default()
 	provider := intents.NewClient(cfg.IntentsBaseURL, cfg.IntentsAPIKey, 15*time.Second)
 	router := httpapi.NewRouter(httpapi.Deps{
@@ -107,6 +114,8 @@ func run() error {
 		Playground:        pg,
 		PlaygroundLimiter: NewLimiterFromEnv(),
 		Invoices:          inv,
+		Switch:            sw,
+		Intents:           provider,
 		RouteVerification: httpapi.RouteVerification{
 			Status: "not_verified",
 			Notes:  "No end-to-end payment has been run on this deployment yet. See docs/NEAR_INTENTS_ROUTE.md.",

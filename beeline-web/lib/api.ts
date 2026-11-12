@@ -245,3 +245,28 @@ export const getAttackLog = () => request<{ data: Attempt[]; stats: AttackStats 
 export function invoiceIdFromText(text: string): string | null {
   return text.match(/\/pay\/(inv_[a-z0-9]{10,40})/i)?.[1] ?? null;
 }
+
+// ---- Cash out to a bank (Switch offramp, route priced by NEAR Intents) ----
+
+export interface CashoutQuote {
+  mode: "sandbox" | "live";
+  amount_usdc: string;
+  route: { provider: string; dry: boolean; amount_in_usdc: string; amount_out_usdc: string; min_amount_out_usdc: string; time_estimate_seconds: number } | null;
+  route_error: string;
+  /** Switch's own quote object. Its exact shape comes from Switch, so fields are read defensively. */
+  payout: { rate?: number; destination?: { amount?: number; currency?: string }; [k: string]: unknown };
+  payout_basis: "bridge_minimum" | "nominal";
+  note: string;
+}
+
+export interface CashoutStart {
+  mode: "sandbox" | "live";
+  note: string;
+  data: { status?: string; reference?: string; deposit?: { amount?: number; address?: string; asset?: string; note?: string[] }; destination?: { amount?: number; currency?: string } };
+}
+
+export const cashoutQuote = (amountUsdc: string) =>
+  request<CashoutQuote>("/api/v1/cashout/quote", { method: "POST", body: JSON.stringify({ amount_usdc: amountUsdc }) });
+
+export const cashoutStart = (amountUsdc: string, bank: { bank_code: string; account_number: string; holder_name: string }) =>
+  request<CashoutStart>("/api/v1/cashout/start", { method: "POST", body: JSON.stringify({ amount_usdc: amountUsdc, bank }) });

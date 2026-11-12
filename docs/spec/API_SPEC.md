@@ -240,6 +240,15 @@ It runs one agent attempt and returns `{scenario, outcome: paid|blocked|error, r
 
 Both run endpoints share the playground rate limit.
 
+### Cash out to a bank (Switch offramp, route priced by NEAR Intents)
+
+Enabled only when `SWITCH_API_KEY` is set (`SWITCH_MODE` is `sandbox` or `live`, default sandbox). Rate limited like the playground. Switch docs reviewed 2026-11-12: <https://docs.onswitch.xyz>.
+
+- `POST /cashout/quote` `{amount_usdc: "25.50"}`: read-only. A NEAR Intents **dry** quote for NEAR USDC to Base USDC, then a Switch `POST /offramp/quote` for the bridge's minimum output. Returns `{mode, amount_usdc, route|null, route_error, payout (Switch's object), payout_basis: "bridge_minimum"|"nominal", note}`. If the bridge cannot be priced, `route` is null and `route_error` says so; the Switch figure is then an unadjusted estimate.
+- `POST /cashout/start` `{amount_usdc, bank: {bank_code, account_number, holder_name}}`: opens a Switch `POST /offramp/initiate` payout session (NGN bank, `base:usdc`). **Refused with 403 unless Switch is in sandbox mode.** Returns Switch's `reference`, `status` and one-time `deposit` address. Nothing is sent to that address by Beeline.
+- `GET /cashout/{reference}`: Switch's payment status for that reference (`AWAITING_DEPOSIT | PROCESSING | COMPLETED | FAILED`), labelled provider-reported.
+- Bank details are validated (10-digit account number, 3-6 digit bank code) before any provider call and are never logged.
+
 ## Error envelope
 
 ```json
