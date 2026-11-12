@@ -308,3 +308,43 @@ export const cashoutDeposit = (depositAddress: string, txHash: string, nearSende
 
 export const cashoutStatus = (reference: string, depositAddress: string) =>
   request<CashoutStatus>(`/api/v1/cashout/${encodeURIComponent(reference)}?deposit_address=${encodeURIComponent(depositAddress)}`);
+
+// ---- Signed-in app (Privy sign-in; every call carries the user's access token) ----
+
+export interface Profile {
+  id: string;
+  shop_name: string;
+  near_account: string;
+  created_at: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  role: "user" | "assistant";
+  body: string;
+  invoice_id: string | null;
+  created_at: string;
+}
+
+export interface ChatReply {
+  reply: string;
+  invoice: Invoice | null;
+  needs_profile?: boolean;
+}
+
+const authed = (token: string, init: RequestInit = {}): RequestInit => ({
+  ...init,
+  headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
+});
+
+export const meGet = (token: string) => request<Profile>("/api/v1/me", authed(token));
+
+export const meUpdate = (token: string, shopName: string, nearAccount: string) =>
+  request<Profile>("/api/v1/me", authed(token, { method: "PUT", body: JSON.stringify({ shop_name: shopName, near_account: nearAccount }) }));
+
+export const meInvoices = (token: string) => request<{ data: Invoice[] }>("/api/v1/me/invoices", authed(token));
+
+export const meMessages = (token: string) => request<{ data: ChatMessage[] }>("/api/v1/me/messages", authed(token));
+
+export const meChat = (token: string, message: string, wallet: string) =>
+  request<ChatReply>("/api/v1/me/chat", authed(token, { method: "POST", body: JSON.stringify({ message, wallet }) }));

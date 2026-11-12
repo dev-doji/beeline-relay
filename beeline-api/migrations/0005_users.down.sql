@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS chat_messages;
+DROP INDEX IF EXISTS invoices_user_idx;
+ALTER TABLE invoices DROP COLUMN IF EXISTS user_id;
+DROP TABLE IF EXISTS users;

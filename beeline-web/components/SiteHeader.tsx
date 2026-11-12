@@ -9,7 +9,7 @@ import { REPO_URL } from "@/lib/api";
 /** Pill navigation for the website. The app pages have their own sidebar, so they hide this. */
 export function SiteHeader() {
   const path = usePathname();
-  if (["/playground", "/monitor", "/vendor", "/pay", "/attacks"].some((p) => path?.startsWith(p))) return null;
+  if (["/playground", "/monitor", "/vendor", "/pay", "/attacks", "/chat"].some((p) => path?.startsWith(p))) return null;
   return (
     <header className="lp-wrap pnav-shell">
       <div className="pnav">
@@ -21,15 +21,16 @@ export function SiteHeader() {
           <i /><i /><i /><i /><i />
         </span>
         <nav className="pnav-links" aria-label="Main">
-          <Link href="/vendor">Payments</Link>
+          <Link href="/chat">Sign in</Link>
+          <Link href="/vendor">Quick link</Link>
           <Link href="/attacks">Attack log</Link>
           <a href="#routes">Share</a>
           <a href={REPO_URL} target="_blank" rel="noreferrer">
             GitHub
           </a>
         </nav>
-        <Link href="/vendor" className="pbtn dark small pnav-cta">
-          Launch app <ArrowRight size={15} aria-hidden />
+        <Link href="/chat" className="pbtn dark small pnav-cta">
+          Open the app <ArrowRight size={15} aria-hidden />
         </Link>
       </div>
     </header>

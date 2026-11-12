@@ -39,6 +39,12 @@ Open the website, go to **Monitor**, add a request and press **Run monitor**.
 
 ---
 
+## Sign-in and Bee (Privy + NEAR AI)
+
+1. **Privy** (dashboard.privy.io): in the app's settings enable **Email** login and an embedded wallet for **NEAR**, and add `https://usebeeline.xyz`, `https://www.usebeeline.xyz` and `http://localhost:3001` as allowed origins.
+2. **Vercel** (project settings, Environment Variables): `NEXT_PUBLIC_PRIVY_APP_ID` = the Privy App ID (public), then redeploy.
+3. **Render** (environment): `PRIVY_APP_ID` = the same App ID. The API checks sign-in tokens with Privy's public keys, so **no Privy secret is needed**. Bee uses the existing `NEAR_AI_API_KEY` and `NEAR_AI_AGENT_MODEL`; without a NEAR AI key Bee falls back to a fixed command parser.
+
 ## Optional: cash out to a bank (Switch)
 
 In the Render service's environment add `SWITCH_API_KEY` (from the Switch dashboard; never put it in git or chat) and `SWITCH_MODE` (`sandbox` or `live`, whichever the key is). Without the key the cash-out panel shows "not configured".

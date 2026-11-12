@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/accounts"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/apperr"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
@@ -61,6 +62,12 @@ type Deps struct {
 	// CashoutLive allows real (live-key) payout sessions up to CashoutLiveMaxUSDC. Off by default.
 	CashoutLive        bool
 	CashoutLiveMaxUSDC string
+	// Accounts and Privy back the signed-in app (/me); nil disables it.
+	Accounts *accounts.Store
+	Privy    *accounts.Verifier
+	// Chat is the NEAR AI model behind Bee, the signed-in assistant; nil falls back to the command parser.
+	Chat      accounts.Completer
+	ChatModel string
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -96,6 +103,11 @@ func NewRouter(d Deps) http.Handler {
 		r.Post("/cashout/quote", h.cashoutQuote)
 		r.Post("/cashout/start", h.cashoutStart)
 		r.Post("/cashout/prepare", h.cashoutPrepare)
+		r.Get("/me", h.requireUser(h.meGet))
+		r.Put("/me", h.requireUser(h.meUpdate))
+		r.Get("/me/invoices", h.requireUser(h.meInvoices))
+		r.Get("/me/messages", h.requireUser(h.meMessages))
+		r.Post("/me/chat", h.requireUser(h.meChat))
 		r.Post("/cashout/deposit", h.cashoutDeposit)
 		r.Get("/cashout/{reference}", h.cashoutStatus)
 

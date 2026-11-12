@@ -132,8 +132,13 @@ func Validate(in *CreateInput) (string, error) {
 	return total.String(), nil
 }
 
-// Create validates, signs and stores an invoice.
+// Create validates, signs and stores an anonymous invoice (the public playground).
 func (s *Service) Create(ctx context.Context, in CreateInput) (*Invoice, error) {
+	return s.CreateFor(ctx, "", in)
+}
+
+// CreateFor is Create for a signed-in user: the invoice is recorded as theirs. userID "" means anonymous.
+func (s *Service) CreateFor(ctx context.Context, userID string, in CreateInput) (*Invoice, error) {
 	amount, err := Validate(&in)
 	if err != nil {
 		return nil, err
@@ -148,9 +153,13 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*Invoice, error) 
 	}
 	sig := hex.EncodeToString(ed25519.Sign(s.Issuer, payload))
 	items, _ := json.Marshal(in.Items)
-	_, err = s.DB.Exec(ctx, `INSERT INTO invoices (id, vendor_name, vendor_handle, payout, asset, amount, memo, items, payload, signature, created_at, expires_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-		p.ID, p.Vendor, in.VendorHandle, p.Payout, p.Asset, p.Amount, p.Memo, items, string(payload), sig, now, expires)
+	var owner *string
+	if userID != "" {
+		owner = &userID
+	}
+	_, err = s.DB.Exec(ctx, `INSERT INTO invoices (id, vendor_name, vendor_handle, payout, asset, amount, memo, items, payload, signature, created_at, expires_at, user_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+		p.ID, p.Vendor, in.VendorHandle, p.Payout, p.Asset, p.Amount, p.Memo, items, string(payload), sig, now, expires, owner)
 	if err != nil {
 		return nil, fmt.Errorf("store invoice: %w", err)
 	}
@@ -172,6 +181,49 @@ func (s *Service) Get(ctx context.Context, id string) (*Invoice, error) {
 	}
 	_ = json.Unmarshal(items, &inv.Items)
 	return &inv, nil
+}
+
+// ListByUser returns a user's invoices, newest first.
+func (s *Service) ListByUser(ctx context.Context, userID string, limit int) ([]Invoice, error) {
+	rows, err := s.DB.Query(ctx, `SELECT id FROM invoices WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]Invoice, 0, len(ids))
+	for _, id := range ids {
+		inv, err := s.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *inv)
+	}
+	return out, nil
+}
+
+// Owner reports which user an invoice belongs to ("" for anonymous playground invoices).
+func (s *Service) Owner(ctx context.Context, id string) (string, error) {
+	var owner *string
+	err := s.DB.QueryRow(ctx, `SELECT user_id FROM invoices WHERE id = $1`, id).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil || owner == nil {
+		return "", err
+	}
+	return *owner, nil
 }
 
 // MarkPaid records the testnet transaction that paid the invoice. It only moves open -> paid.

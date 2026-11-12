@@ -16,6 +16,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/accounts"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/agent"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
@@ -72,6 +73,7 @@ func run() error {
 	}
 	var pg *playground.Service
 	var inv *invoices.Service
+	var chatAI *nearai.Client
 	if pgCfg != nil {
 		pg = &playground.Service{
 			Cfg:   *pgCfg,
@@ -81,6 +83,7 @@ func run() error {
 		if key := os.Getenv("NEAR_AI_API_KEY"); key != "" {
 			ai := nearai.NewClient(os.Getenv("NEAR_AI_API_BASE_URL"), key, 60*time.Second)
 			pg.Reviewer = ai
+			chatAI = ai
 			pg.Agent = &agent.Agent{
 				LLM:   ai,
 				Model: envOr("NEAR_AI_AGENT_MODEL", "z-ai/glm-5.3-flash"),
@@ -94,6 +97,13 @@ func run() error {
 		log.Info("playground enabled", "vault", pgCfg.Vault, "live_ai", pg.Reviewer != nil, "invoice_issuer", inv.IssuerPublicKeyHex())
 	}
 
+	var acct *accounts.Store
+	var privy *accounts.Verifier
+	if appID := os.Getenv("PRIVY_APP_ID"); appID != "" {
+		acct = &accounts.Store{DB: pool, Now: time.Now}
+		privy = accounts.NewVerifier(appID)
+		log.Info("sign-in enabled (Privy)", "app_id", appID)
+	}
 	var sw *switchramp.Client
 	if key := os.Getenv("SWITCH_API_KEY"); key != "" {
 		sw = switchramp.New(os.Getenv("SWITCH_BASE_URL"), key, os.Getenv("SWITCH_MODE"))
@@ -116,6 +126,10 @@ func run() error {
 		Invoices:           inv,
 		Switch:             sw,
 		Intents:            provider,
+		Accounts:           acct,
+		Chat:               chatCompleter(chatAI),
+		ChatModel:          envOr("NEAR_AI_AGENT_MODEL", "z-ai/glm-5.3-flash"),
+		Privy:              privy,
 		CashoutLive:        os.Getenv("CASHOUT_LIVE") == "on",
 		CashoutLiveMaxUSDC: os.Getenv("CASHOUT_LIVE_MAX_USDC"),
 		RouteVerification: httpapi.RouteVerification{
@@ -172,4 +186,12 @@ func NewLimiterFromEnv() *httpapi.RunLimiter {
 		perDay = v
 	}
 	return httpapi.NewRunLimiter(perMin, time.Minute, perDay)
+}
+
+// chatCompleter avoids a typed-nil interface: no NEAR AI key means no model, so Bee falls back to the command parser.
+func chatCompleter(c *nearai.Client) accounts.Completer {
+	if c == nil {
+		return nil
+	}
+	return c
 }
