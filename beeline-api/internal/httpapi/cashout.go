@@ -210,5 +210,6 @@ func (h *handlers) cashoutStatus(w http.ResponseWriter, r *http.Request) {
 		h.cashoutError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"mode": h.d.Switch.Mode, "source": "provider-reported (Switch)", "data": json.RawMessage(data)})
+	writeJSON(w, http.StatusOK, map[string]any{"mode": h.d.Switch.Mode, "source": "provider-reported (Switch)", "data": json.RawMessage(data),
+		"bridge": h.bridgeStatus(ctx, r.URL.Query().Get("deposit_address"))})
 }

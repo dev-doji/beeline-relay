@@ -270,3 +270,41 @@ export const cashoutQuote = (amountUsdc: string) =>
 
 export const cashoutStart = (amountUsdc: string, bank: { bank_code: string; account_number: string; holder_name: string }) =>
   request<CashoutStart>("/api/v1/cashout/start", { method: "POST", body: JSON.stringify({ amount_usdc: amountUsdc, bank }) });
+
+export interface CashoutPrepared {
+  mode: "sandbox" | "live";
+  payout: { source: string; reference: string; status: string; naira: string; currency: string; deposit_amount_usdc: string; deposit_asset: string };
+  route: {
+    source: string;
+    deposit_address: string;
+    send_usdc: string;
+    send_units: string;
+    min_send_usdc: string;
+    delivers_usdc: string;
+    deliver_to: string;
+    refund_to: string;
+    time_estimate_seconds: number;
+    deadline: string | null;
+    token_contract: string;
+  } | null;
+  note: string;
+}
+
+export interface CashoutStatus {
+  mode: string;
+  source: string;
+  data: { status?: string };
+  bridge: { source?: string; status?: string; error?: string } | null;
+}
+
+export const cashoutPrepare = (amountUsdc: string, nearAccount: string, bank: { bank_code: string; account_number: string; holder_name: string }) =>
+  request<CashoutPrepared>("/api/v1/cashout/prepare", { method: "POST", body: JSON.stringify({ amount_usdc: amountUsdc, near_account: nearAccount, bank }) });
+
+export const cashoutDeposit = (depositAddress: string, txHash: string, nearSender: string) =>
+  request<{ source: string; status: string }>("/api/v1/cashout/deposit", {
+    method: "POST",
+    body: JSON.stringify({ deposit_address: depositAddress, tx_hash: txHash, near_sender_account: nearSender }),
+  });
+
+export const cashoutStatus = (reference: string, depositAddress: string) =>
+  request<CashoutStatus>(`/api/v1/cashout/${encodeURIComponent(reference)}?deposit_address=${encodeURIComponent(depositAddress)}`);

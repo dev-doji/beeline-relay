@@ -240,14 +240,16 @@ It runs one agent attempt and returns `{scenario, outcome: paid|blocked|error, r
 
 Both run endpoints share the playground rate limit.
 
-### Cash out to a bank (Switch offramp, route priced by NEAR Intents)
+### Cash out to a bank (Switch offramp, route through NEAR Intents)
 
-Enabled only when `SWITCH_API_KEY` is set (`SWITCH_MODE` is `sandbox` or `live`, default sandbox). Rate limited like the playground. Switch docs reviewed 2026-11-12: <https://docs.onswitch.xyz>.
+Enabled only when `SWITCH_API_KEY` is set (`SWITCH_MODE` is `sandbox` or `live`, default sandbox). Rate limited like the playground. Switch docs reviewed 2026-11-12: <https://docs.onswitch.xyz>. Beeline never holds keys and sends nothing: the vendor signs the NEAR transfer in their own wallet.
 
-- `POST /cashout/quote` `{amount_usdc: "25.50"}`: read-only. A NEAR Intents **dry** quote for NEAR USDC to Base USDC, then a Switch `POST /offramp/quote` for the bridge's minimum output. Returns `{mode, amount_usdc, route|null, route_error, payout (Switch's object), payout_basis: "bridge_minimum"|"nominal", note}`. If the bridge cannot be priced, `route` is null and `route_error` says so; the Switch figure is then an unadjusted estimate.
-- `POST /cashout/start` `{amount_usdc, bank: {bank_code, account_number, holder_name}}`: opens a Switch `POST /offramp/initiate` payout session (NGN bank, `base:usdc`). **Refused with 403 unless Switch is in sandbox mode.** Returns Switch's `reference`, `status` and one-time `deposit` address. Nothing is sent to that address by Beeline.
-- `GET /cashout/{reference}`: Switch's payment status for that reference (`AWAITING_DEPOSIT | PROCESSING | COMPLETED | FAILED`), labelled provider-reported.
-- Bank details are validated (10-digit account number, 3-6 digit bank code) before any provider call and are never logged.
+- `POST /cashout/quote` `{amount_usdc: "25.50"}`: read-only. A NEAR Intents **dry** quote for NEAR USDC to Base USDC, then a Switch `POST /offramp/quote` for the bridge's minimum output. Returns `{mode, amount_usdc, route|null, route_error, payout (Switch's object), payout_basis: "bridge_minimum"|"nominal", note}`.
+- `POST /cashout/prepare` `{amount_usdc, near_account, bank: {bank_code, account_number, holder_name}}`: opens a Switch `POST /offramp/initiate` session (NGN bank, `base:usdc`), then requests a **non-dry NEAR Intents `EXACT_OUTPUT` quote** that delivers exactly Switch's `deposit.amount` to Switch's Base address, depositing on NEAR (`ORIGIN_CHAIN`) and refunding to `near_account`. Returns `{mode, payout: {source, reference, status, naira, currency, deposit_amount_usdc, deposit_asset}, route: {deposit_address, send_usdc, send_units, min_send_usdc, delivers_usdc, deliver_to, refund_to, time_estimate_seconds, deadline, token_contract}|null, note}`. `route` is null in Switch sandbox (its deposit address is a placeholder). In **live** mode it is refused (403) unless the server has `CASHOUT_LIVE=on`, and amounts above `CASHOUT_LIVE_MAX_USDC` (default 5) are refused. Nothing moves until the vendor sends the USDC.
+- `POST /cashout/deposit` `{deposit_address, tx_hash, near_sender_account?}`: forwards the NEAR transaction hash to NEAR Intents (`POST /v0/deposit/submit`) to speed detection. It sends nothing. Safe to retry.
+- `GET /cashout/{reference}?deposit_address=<near address>`: `{source: "provider-reported (Switch)", data: {status: AWAITING_DEPOSIT|PROCESSING|COMPLETED|FAILED, ...}, bridge: {source: "provider-reported (NEAR Intents)", status, ...}|null}`. Each leg is labelled by the provider that reported it; the cash-out is done only when Switch says `COMPLETED`.
+- `POST /cashout/start`: older, sandbox-only payout session without the bridge; refused with 403 in live mode.
+- Bank details are validated before any provider call and are never logged. Provider amounts are handled as decimal strings and integer base units, never floats.
 
 ## Error envelope
 

@@ -41,7 +41,9 @@ Open the website, go to **Monitor**, add a request and press **Run monitor**.
 
 ## Optional: cash out to a bank (Switch)
 
-In the Render service's environment add `SWITCH_API_KEY` (from the Switch dashboard; never put it in git or chat) and `SWITCH_MODE` (`sandbox` or `live`, whichever the key is). Without the key the cash-out panel shows "not configured". With a `live` key the API still refuses to open payout sessions.
+In the Render service's environment add `SWITCH_API_KEY` (from the Switch dashboard; never put it in git or chat) and `SWITCH_MODE` (`sandbox` or `live`, whichever the key is). Without the key the cash-out panel shows "not configured".
+
+With a `live` key the price preview works, but **real cash-outs stay off** until you also set `CASHOUT_LIVE=on` (and optionally `CASHOUT_LIVE_MAX_USDC`, default 5). Leave `CASHOUT_LIVE` unset except while you run the real test in `docs/REAL_MONEY_TEST.md`, and switch it off again afterwards.
 
 ## Good to know
 

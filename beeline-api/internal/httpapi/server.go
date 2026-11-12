@@ -58,6 +58,9 @@ type Deps struct {
 	// Switch (offramp to a bank) and Intents (route pricing) back the cash-out preview; nil disables it.
 	Switch  *switchramp.Client
 	Intents intents.Provider
+	// CashoutLive allows real (live-key) payout sessions up to CashoutLiveMaxUSDC. Off by default.
+	CashoutLive        bool
+	CashoutLiveMaxUSDC string
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -92,6 +95,8 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/playground/attempts", h.attackLog)
 		r.Post("/cashout/quote", h.cashoutQuote)
 		r.Post("/cashout/start", h.cashoutStart)
+		r.Post("/cashout/prepare", h.cashoutPrepare)
+		r.Post("/cashout/deposit", h.cashoutDeposit)
 		r.Get("/cashout/{reference}", h.cashoutStatus)
 
 		r.Group(func(r chi.Router) {
