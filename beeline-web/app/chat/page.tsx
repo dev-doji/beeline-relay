@@ -4,66 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { useCreateWallet } from "@privy-io/react-auth/extended-chains";
-import { ArrowRight, ArrowUp, Ban, FileText, Link2, ListChecks, LogOut, Plus, Store, Wallet } from "lucide-react";
+import { ArrowRight, Ban } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { Honeycomb } from "@/components/landing/Honeycomb";
-import { ShareLink } from "@/components/invoice/ShareLink";
-import { CashOut } from "@/components/invoice/CashOut";
-import {
-  ApiError,
-  type ChatMessage,
-  type Invoice,
-  type Profile,
-  formatUSDC,
-  meChat,
-  meGet,
-  meInvoices,
-  meMessages,
-  shortKey,
-} from "@/lib/api";
-
-const EXAMPLES = [
-  { icon: Store, text: "Set up my shop" },
-  { icon: FileText, text: "Invoice 2 for logo design" },
-  { icon: Link2, text: "Give me a permanent pay link" },
-  { icon: ListChecks, text: "Show my invoices" },
-];
-
-function BeeAvatar() {
-  return (
-    <span className="bee-av" aria-hidden>
-      <BeeMark size={22} />
-    </span>
-  );
-}
-
-const CAPABILITIES = [
-  "Set up your shop and the NEAR account that gets paid",
-  "Make an invoice and give you a link to share on WhatsApp, Facebook, X, Telegram, email or SMS, or a QR for your counter",
-  "Give you one permanent pay link where each customer chooses the amount",
-  "Show your invoices and which ones are paid",
-  "Explain how the vault blocks fake or changed payments",
-];
-
-const PERMANENT = /\/pay\/to\?[^\s)]+/;
-
-const dare = (vendor: string, link: string) => `Can you trick my AI payment agent into paying you instead of ${vendor}? Try anything: ${link}`;
+import { ApiError, meChat, meGet, meInvoices, meMessages } from "@/lib/api";
+import { ChatApp, type ChatData } from "./ChatApp";
 
 type NearWallet = { type: string; chainType?: string; address?: string };
 
 export default function ChatPage() {
   const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
   const { createWallet } = useCreateWallet();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showCash, setShowCash] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
   const creating = useRef(false);
-  const bottom = useRef<HTMLDivElement>(null);
-  const input = useRef<HTMLTextAreaElement>(null);
 
   const wallet = useMemo(
     () => (user?.linkedAccounts as NearWallet[] | undefined)?.find((a) => a.type === "wallet" && a.chainType === "near")?.address ?? "",
@@ -77,69 +30,25 @@ export default function ChatPage() {
     return t;
   }, [getAccessToken]);
 
-  const fail = (e: unknown) => setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
-
   // Give every new user a NEAR wallet, created and held through Privy (never by Beeline).
   useEffect(() => {
     if (!ready || !authenticated || !user || wallet || creating.current) return;
     creating.current = true;
     createWallet({ chainType: "near" }).catch(() => {
       creating.current = false;
-      setError("Could not create your NEAR wallet yet. You can still paste your own NEAR account below.");
+      setWalletError("Could not create your NEAR wallet yet. You can still tell Bee your own NEAR account.");
     });
   }, [ready, authenticated, user, wallet, createWallet]);
 
-  const refresh = useCallback(async () => {
-    try {
-      const t = await token();
-      const [p, m, i] = await Promise.all([meGet(t), meMessages(t), meInvoices(t)]);
-      setProfile(p);
-      setMessages(m.data);
-      setInvoices(i.data);
-    } catch (e) {
-      fail(e);
-    }
+  const load = useCallback(async (): Promise<ChatData> => {
+    const t = await token();
+    const [profile, m, i] = await Promise.all([meGet(t), meMessages(t), meInvoices(t)]);
+    return { profile, messages: m.data, invoices: i.data };
   }, [token]);
+  const loadInvoices = useCallback(async () => (await meInvoices(await token())).data, [token]);
+  const sendMessage = useCallback(async (message: string) => void (await meChat(await token(), message, wallet)), [token, wallet]);
 
-  useEffect(() => {
-    if (ready && authenticated) void refresh();
-  }, [ready, authenticated, refresh]);
-
-  // Pick up "paid" status without a reload.
-  useEffect(() => {
-    if (!authenticated) return;
-    const t = setInterval(() => {
-      token().then(meInvoices).then((r) => setInvoices(r.data)).catch(() => undefined);
-    }, 15000);
-    return () => clearInterval(t);
-  }, [authenticated, token]);
-
-  useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, busy]);
-
-  const byId = useMemo(() => new Map(invoices.map((i) => [i.id, i])), [invoices]);
-
-  async function send(message: string) {
-    const m = message.trim();
-    if (!m || busy) return;
-    setBusy(true);
-    setError(null);
-    setText("");
-    setMessages((xs) => [...xs, { id: -Date.now(), role: "user", body: m, invoice_id: null, created_at: new Date().toISOString() }]);
-    try {
-      const t = await token();
-      await meChat(t, m, wallet);
-      await refresh();
-    } catch (e) {
-      fail(e);
-    } finally {
-      setBusy(false);
-      input.current?.focus();
-    }
-  }
-
-  if (!ready) return <div className="cx-center"><p className="help">Loading…</p></div>;
+  if (!ready) return <div className="cx-center"><p className="cx-muted">Loading…</p></div>;
 
   if (!authenticated) {
     return (
@@ -214,137 +123,15 @@ export default function ChatPage() {
     );
   }
 
-  const needsSetup = !profile || !profile.shop_name || !profile.near_account;
   return (
-    <div className="lp cx-shell">
-      <aside className="cx-side" aria-label="Your invoices">
-        <Link href="/" className="cx-brand" aria-label="Beeline home">
-          <span className="cx-logo"><BeeMark size={22} /></span> <span>Beeline</span>
-        </Link>
-        <button className="pbtn dark" onClick={() => (setShowCash(false), input.current?.focus())}>
-          <Plus size={15} aria-hidden /> New invoice
-        </button>
-        <div className="cx-list">
-          <span className="cap">your invoices</span>
-          {invoices.length === 0 && <span className="help">None yet. Ask for one in the chat.</span>}
-          {invoices.map((i) => (
-            <Link key={i.id} href={`/pay/${i.id}`} className="cx-inv">
-              <span>{formatUSDC(i.amount)} USDC</span>
-              <span className={i.status === "paid" ? "cx-tag ok" : "cx-tag"}>{i.status === "paid" ? "Paid" : "Open"}</span>
-            </Link>
-          ))}
-        </div>
-        <button className="pbtn" onClick={() => setShowCash((s) => !s)}>
-          <Wallet size={15} aria-hidden /> Cash out to bank
-        </button>
-        <div className="cx-user">
-          <span title={email}>{email || "Signed in"}</span>
-          {wallet && <span className="help" title={wallet}>Wallet {shortKey(wallet, 5)}</span>}
-          <button className="pbtn small" onClick={() => void logout()}>
-            <LogOut size={14} aria-hidden /> Sign out
-          </button>
-        </div>
-      </aside>
-
-      <section className="cx-main">
-        <header className="cx-top">
-          <BeeAvatar />
-          <div>
-            <b>Bee</b>
-            <span className="cx-status">
-              <i aria-hidden /> online · near testnet
-            </span>
-          </div>
-        </header>
-        <div className="cx-scroll">
-          <div className="cx-col">
-            {showCash && <CashOut />}
-            <div className="cx-msg bot">
-              <BeeAvatar />
-              <div className="cx-body">
-              <p>
-                Hi, I&apos;m Bee, your payment assistant{profile?.shop_name ? ` for ${profile.shop_name}` : ""}. Here is what I can do:
-              </p>
-              <ul className="cx-caps">
-                {CAPABILITIES.map((c) => (
-                  <li key={c}>{c}</li>
-                ))}
-              </ul>
-              <p>{needsSetup ? "Let's start: what is your shop or business name, and which NEAR account should receive the money? You can say \"use my wallet\" and I will use the wallet I created for you." : "What would you like to do?"}</p>
-              {messages.length === 0 && (
-                <div className="cx-chips">
-                  {EXAMPLES.map((e) => (
-                    <button key={e.text} className="cx-chip" onClick={() => void send(e.text)}>
-                      <e.icon size={14} aria-hidden /> {e.text}
-                    </button>
-                  ))}
-                </div>
-              )}
-              </div>
-            </div>
-            {messages.map((m) => {
-              const inv = m.invoice_id ? byId.get(m.invoice_id) : undefined;
-              const link = inv && typeof window !== "undefined" ? `${window.location.origin}/pay/${inv.id}` : "";
-              return (
-                <div key={m.id} className={m.role === "user" ? "cx-msg me" : "cx-msg bot"}>
-                  {m.role === "assistant" && <BeeAvatar />}
-                  <div className="cx-body">
-                  <p>{m.body.replace(PERMANENT, "").trim()}</p>
-                  {m.role === "assistant" && PERMANENT.test(m.body) && typeof window !== "undefined" && (
-                    <div className="panel cx-card">
-                      <b>Your permanent pay link</b>
-                      <ShareLink id="" link={`${window.location.origin}${m.body.match(PERMANENT)![0]}`} vendor={profile?.shop_name || "my shop"} amountLabel="" dareText="" />
-                    </div>
-                  )}
-                  {inv && (
-                    <div className="panel cx-card">
-                      <div className="cx-card-top">
-                        <b>{formatUSDC(inv.amount)} USDC</b>
-                        <span className={inv.status === "paid" ? "cx-tag ok" : "cx-tag"}>{inv.status === "paid" ? "Paid" : "Open"}</span>
-                      </div>
-                      <ShareLink id={inv.id} link={link} vendor={inv.vendor_name} amountLabel={`${formatUSDC(inv.amount)} USDC`} dareText={dare(inv.vendor_name, link)} />
-                    </div>
-                  )}
-                  </div>
-                </div>
-              );
-            })}
-            {busy && (
-              <div className="cx-msg bot">
-                <BeeAvatar />
-                <div className="cx-body">
-                  <span className="cx-typing" role="status" aria-label="Bee is cx-typing">
-                    <i /><i /><i />
-                  </span>
-                </div>
-              </div>
-            )}
-            {error && <div className="alert" role="alert">{error}</div>}
-            <div ref={bottom} />
-          </div>
-        </div>
-        <form className="cx-composer" onSubmit={(e) => (e.preventDefault(), void send(text))}>
-          <textarea
-            ref={input}
-            value={text}
-            rows={1}
-            maxLength={500}
-            placeholder={needsSetup ? "Tell Bee your shop name and NEAR account" : "Message Bee, for example: invoice 25 for logo design"}
-            disabled={busy}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send(text);
-              }
-            }}
-          />
-          <button className="cx-send" type="submit" aria-label="Send" disabled={!text.trim() || busy}>
-            <ArrowUp size={18} />
-          </button>
-        </form>
-        <p className="cx-foot">test usdc on near testnet, invoices up to 5 usdc. bee can make mistakes, but it cannot cx-send or move money.</p>
-      </section>
-    </div>
+    <ChatApp
+      email={email}
+      wallet={wallet}
+      logout={() => void logout()}
+      load={load}
+      loadInvoices={loadInvoices}
+      sendMessage={sendMessage}
+      walletError={walletError}
+    />
   );
 }
