@@ -24,7 +24,7 @@
 param(
   [Parameter(Mandatory = $true)][ValidateSet('Create', 'Balance', 'Send')][string]$Action,
   [ValidatePattern('^[a-f0-9]{24}$')][string]$WalletId,
-  [string]$Name = 'Beeline real-money test',
+  [string]$Name = 'BeelineTest',   # Switch only accepts letters and numbers (at least one letter) and rejects crypto-related words
   [string]$Recipient,
   [decimal]$Amount,
   [string]$BaseUrl = 'https://api.onswitch.xyz'   # only changed by tests against a local fake server
@@ -59,6 +59,10 @@ function Call($method, $path, $body) {
     if ($status -eq 401 -or $status -eq 403) { $hint = ' (the key was refused: check it is the live service key from the Switch dashboard, copied without spaces, and that this product is enabled for your account)' }
     throw "Switch returned HTTP $status for $method $path`: $body$hint"
   }
+}
+
+if ($Action -eq 'Create' -and ($Name -notmatch '^[A-Za-z0-9]{3,40}$' -or $Name -notmatch '[A-Za-z]')) {
+  throw "-Name must be 3 to 40 letters and numbers only (no spaces, hyphens or symbols, at least one letter), and must not contain crypto-related words like wallet, usdc or bitcoin. Example: BeelineTest"
 }
 
 function NeedWallet { if (-not $WalletId) { throw '-WalletId is required for this action (the id printed by -Action Create).' } }
