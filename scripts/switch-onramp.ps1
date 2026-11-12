@@ -89,6 +89,7 @@ Write-Host ('  Rate         : 1 USD = {0:N2} {1}' -f $q.rate, $q.source.currency
 Write-Host ('  Settles in   : {0}' -f $q.settlement)
 Write-Host ('  Quote expires: {0}' -f $q.expiry)
 if ($usd -gt $CapUsd) { throw "This is USD $usd, over the USD $CapUsd cap. Lower -AmountNGN." }
+if ($usd -lt 1.0) { throw ('This would deliver about USD {0:N2}, below Switch''s USD 1 minimum for Nigeria. Raise -AmountNGN.' -f $usd) }
 if ($QuoteOnly) { Write-Host "`nQuote only: stopping here. Nothing was bought." -ForegroundColor Green; return }
 
 # --- 2. explicit confirmation ---

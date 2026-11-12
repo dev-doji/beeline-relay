@@ -26,8 +26,10 @@ A Switch wallet holds USDC and **sends it to any address with the network fee pa
 .\scripts\switch-wallet.ps1 -Action Create        # prints the wallet id and its Base address
 ```
 
-**Step 1: get a few dollars of USDC (real naira through Switch).**
-Pay about 4,500 NGN by bank transfer (about $3.25 at the 2026-11-07 rate of 1,382.76 NGN per USD; Nigeria's minimum is $1) and receive about 3 USDC on **Base**, credited to the Switch wallet. Switch gives a one-time bank account valid for 30 minutes and an exact amount to send. This is the only step that needs a local bank account. If the owner already holds USDC, skip it.
+**Step 1: get a little USDC (real naira through Switch).**
+The owner's budget is **1,500 NGN**. At the 2026-11-12 rate of 1,410.32 NGN per USD, Switch quotes 1,500 NGN as about **1.0636 USDC** on **Base**, credited to the Switch wallet. That is only about 6% above Switch's USD 1 minimum for Nigeria, so `switch-onramp.ps1` refuses any amount that would fall below USD 1 (if the rate moves against us, raise `-AmountNGN` a little). Switch gives a one-time bank account valid for 30 minutes and an exact amount to send. This is the only step that needs a local bank account. If the owner already holds USDC, skip it.
+
+Dry quotes on 2026-11-12 show the later steps still price at about 1 USDC or less (docs/NEAR_INTENTS_ROUTE.md, section 6c): Base to NEAR native, 1.0 USDC in gives 0.9955 out, 0.7 gives 0.6956; NEAR to Base through the vault's rail, 1.0 gives 0.9974, 0.5 gives 0.4975. Switch's own fee for sending out of the wallet is unknown until the wallet holds USDC (the script shows it before you confirm), and it comes out of the roughly 0.06 USDC of headroom, so step 2 may need to send a little less than 1 USDC.
 
 ```powershell
 .\scripts\switch-onramp.ps1 -WalletId <wallet id> -QuoteOnly   # see the quote, buy nothing
@@ -60,12 +62,12 @@ The Privy panel on `/fund` (docs/DEPLOY.md) is not needed for this test. Its spo
 
 | Item | About |
 | --- | --- |
-| Naira to USDC through Switch | 4,500 NGN (about $3.25), plus Switch's spread |
+| Naira to USDC through Switch | 1,500 NGN (about $1.06; the owner's budget), plus your bank's transfer fee |
 | Base to NEAR bridge fee | under $0.05 |
 | NEAR to Base payout fee | about $0.01 to $0.03 |
 | Switch wallet send in step 2 | the fee Switch quotes (estimated in USD, paid in stablecoin; a few cents to start with, shown before you confirm) |
 | NEAR gas for step 3 | about 0.1 NEAR (about $0.40) |
-| **Total at risk** | **about $4 to $5, never more than the $10 cap** |
+| **Total at risk** | **about $1.1 plus about 0.1 NEAR of gas (about $0.40), never more than the $10 cap** |
 
 ## What the README may say afterwards
 
