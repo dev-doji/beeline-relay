@@ -23,7 +23,7 @@ export function SiteHeader() {
         <nav className="pnav-links" aria-label="Main">
           <Link href="/vendor">Pay links</Link>
           <Link href="/attacks">Attack log</Link>
-          <a href="#track">Track</a>
+          <a href="#routes">Routes</a>
           <a href={REPO_URL} target="_blank" rel="noreferrer">
             GitHub
           </a>

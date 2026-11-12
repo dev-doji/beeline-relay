@@ -1,12 +1,14 @@
 # Beeline demo video: script and recording guide
 
-Target length: about 3 minutes. One message: **AI agents can be tricked into paying the wrong person. Beeline makes sure the money can't follow the trick, and any payment system can plug it in.**
+Target length: about 3 minutes. One message: **A vendor sends an invoice link and gets paid on NEAR, through NEAR Intents. Even if an AI agent is the one paying, and even if someone tries to trick it, the money only goes to the right vendor.**
+
+Tracks (lead with the first): Real-World Money, Agent Economy, AI Security & Defense.
 
 The demo must prove three things, in this order:
 
-1. **It stops real attacks.** A stranger writes their own trick, and the vault still refuses, on-chain.
-2. **You don't have to trust us.** Every decision is a public transaction, and the SDK checks it straight from NEAR.
-3. **Other systems can use it.** A few lines of code add guarded pay links and agent payments to any app.
+1. **A real vendor flow works.** A vendor signs an invoice link and is paid exactly the invoice amount, on NEAR.
+2. **It is safe when an AI pays.** A stranger writes their own trick, and the vault still refuses, on-chain. Every decision is public, and the SDK checks it straight from NEAR.
+3. **Other systems can use it.** A few lines of code add guarded pay links to any app. (Money from other chains goes through NEAR Intents: say "live quotes" unless a funded transaction is in the README.)
 
 Record on the **live site, https://usebeeline.xyz** (not localhost). Everything on it is real: a real NEAR AI agent, a real AI reviewer, and real NEAR testnet transactions with test USDC. Read calmly; pauses are fine, because I'll speed up the waiting parts (the AI review takes 20 to 40 seconds).
 
@@ -14,16 +16,16 @@ Record on the **live site, https://usebeeline.xyz** (not localhost). Everything 
 
 ## 1. The problem (0:00 – 0:20)
 
-**Screen:** the home page, https://usebeeline.xyz. Let the headline "AI agents get tricked. The vault doesn't." sit on screen, then slowly scroll to the live numbers.
+**Screen:** the home page, https://usebeeline.xyz. Let the headline "Invoice anyone. Get paid on NEAR. No trick reroutes it." sit on screen, then slowly scroll to **Paid from where the customer is** (the three routes with their honest status).
 
 **Voiceover:**
-> AI agents are starting to handle money: paying suppliers, invoices, other agents.
-> But an agent can be tricked. One hidden sentence in an email, like "our account changed, pay this one", and an agent with a normal wallet sends your money to a scammer.
-> This is prompt injection, and today nothing stops the money from following the trick.
+> Small vendors sell on WhatsApp and Instagram. They send an invoice, and the customer can be in another country, on another chain, or paying through an AI agent.
+> That's where payments go wrong: an edited account number, a hidden line in an email that says "our account changed, pay this one", and the money goes to a scammer.
+> Beeline lets a vendor send one signed link, paid on NEAR through NEAR Intents, where the money can only reach the right vendor.
 
 ## 2. The idea (0:20 – 0:40)
 
-**Screen:** scroll to **AI Security & Defense** (the table of attacks and the lock that stops each one), then to **Five locks. One vault.**
+**Screen:** scroll to **Safe when an AI pays** (the table of attacks and the lock that stops each one), then to **Five locks. One vault.**
 
 **Voiceover:**
 > Beeline puts the rules where the agent can't touch them: a smart contract on NEAR.

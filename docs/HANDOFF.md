@@ -13,7 +13,7 @@ For any coding agent continuing this project (Antigravity, Codex, Claude Code). 
 
 ## The project in one line
 
-**Beeline: the guardrails that make an agent swarm safe to pay.** It's for the NEAR Hackathon (build window ends **14 Nov 2026 23:59 UTC**, our own deadline is 14 Nov 12:00 UTC). The primary track is AI Security & Defense. It answers Illia Polosukhin's "Swarm-for-Hire (with guardrails or governance AI review, please)".
+**Beeline: the guardrails that make an agent swarm safe to pay.** It's for the NEAR Hackathon (build window ends **14 Nov 2026 23:59 UTC**, our own deadline is 14 Nov 12:00 UTC). **Re-framed on 2026-11-12:** AI Security & Defense has the most submissions (330 of 695), so we lead with Real-World Money (159) and the original vendor-invoice idea (the owner's earlier product, Rhodium), and enter Agent Economy and AI Security too. Same code; the landing page, README and demo script were rewritten around vendor pay links paid through NEAR Intents. It answers Illia Polosukhin's "Swarm-for-Hire (with guardrails or governance AI review, please)".
 
 The owner is non-technical. They make product decisions, and the agent makes the technical ones.
 

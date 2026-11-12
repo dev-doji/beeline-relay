@@ -4,9 +4,9 @@ import { SiteHeader } from "@/components/SiteHeader";
 
 
 export const metadata: Metadata = {
-  title: "Beeline: guardrails for AI agent payments on NEAR",
+  title: "Beeline: invoice links for vendors, paid on NEAR",
   description:
-    "Chat with an AI payment agent and try to trick it. A NEAR vault enforces genuine quotes, allowlists, limits and a TEE-signed AI reviewer on-chain.",
+    "Vendors send signed pay links; customers or their AI agents pay in USDC through NEAR Intents. A NEAR vault pays only the exact vendor and amount, with limits and a TEE-signed AI reviewer checked on-chain.",
 };
 
 export const viewport: Viewport = { themeColor: "#f7f7fa", width: "device-width", initialScale: 1 };
