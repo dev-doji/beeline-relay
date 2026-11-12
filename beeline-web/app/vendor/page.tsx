@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowRight, Check, Plus, Store, Trash2 } from "lucide-react";
 import { ShareLink } from "@/components/invoice/ShareLink";
 import { CashOut } from "@/components/invoice/CashOut";
 import { Receipt, lineTotal } from "@/components/invoice/Receipt";
 import { AppFrame } from "@/components/AppFrame";
-import { ApiError, type Invoice, type InvoiceItem, createInvoice, formatUSDC, getPlayground, toBaseUnits } from "@/lib/api";
+import { ApiError, type Invoice, type InvoiceItem, createInvoice, formatUSDC, toBaseUnits } from "@/lib/api";
 
 interface DraftItem {
   name: string;
@@ -14,10 +14,8 @@ interface DraftItem {
   price: string; // USDC, e.g. "0.15"
 }
 
-const START: DraftItem[] = [
-  { name: "Linen shirt", quantity: "3", price: "0.15" },
-  { name: "Express delivery", quantity: "1", price: "0.05" },
-];
+// Nothing is pre-filled: the vendor enters their own shop, account and items.
+const START: DraftItem[] = [{ name: "", quantity: "1", price: "" }];
 
 const dare = (vendor: string, link: string) =>
   `Can you trick my AI payment agent into paying you instead of ${vendor}? Try anything: ${link}`;
@@ -25,20 +23,10 @@ const dare = (vendor: string, link: string) =>
 const NEAR_ACCOUNT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 
 export default function VendorPage() {
-  const [vendor, setVendor] = useState("MS Clothing");
-  const [handle, setHandle] = useState("@msclothing");
-  const [memo, setMemo] = useState("Order #1842");
+  const [vendor, setVendor] = useState("");
+  const [handle, setHandle] = useState("");
+  const [memo, setMemo] = useState("");
   const [payout, setPayout] = useState("");
-
-  // The demo vendor's real testnet account (ms-clothing.<owner>), read from the API.
-  useEffect(() => {
-    getPlayground()
-      .then((st) => {
-        const v = st.accounts.find((a) => a.role === "vendor");
-        if (v) setPayout((p) => p || v.account);
-      })
-      .catch(() => undefined);
-  }, []);
   const [items, setItems] = useState<DraftItem[]>(START);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +57,7 @@ export default function VendorPage() {
       : "";
 
   async function submit() {
-    if (!valid || !payoutOk || overCap || busy) return;
+    if (!valid || !payoutOk || overCap || busy || !vendor.trim()) return;
     setBusy(true);
     setError(null);
     try {
@@ -113,25 +101,27 @@ export default function VendorPage() {
           <div className="row2">
             <label className="field">
               Shop name
-              <input value={vendor} maxLength={60} onChange={(e) => (setVendor(e.target.value), setCreated(null))} />
+              <input value={vendor} maxLength={60} placeholder="Your shop or business name" onChange={(e) => (setVendor(e.target.value), setCreated(null))} />
             </label>
             <label className="field">
               Handle
-              <input value={handle} maxLength={60} onChange={(e) => (setHandle(e.target.value), setCreated(null))} />
+              <input value={handle} maxLength={60} placeholder="@yourshop (optional)" onChange={(e) => (setHandle(e.target.value), setCreated(null))} />
             </label>
           </div>
           <label className="field">
             Payout account (NEAR testnet)
-            <input value={payout} spellCheck={false} onChange={(e) => (setPayout(e.target.value.trim().toLowerCase()), setCreated(null))} />
+            <input value={payout} spellCheck={false} placeholder="yourshop.yourname.testnet" onChange={(e) => (setPayout(e.target.value.trim().toLowerCase()), setCreated(null))} />
             {payoutOk ? (
               <span className="help">A real testnet account. It is NOT on the vault’s approved list: only the signed invoice lets Bee pay it, and the money really lands there.</span>
+            ) : payout ? (
+              <span className="err">Enter a NEAR account, e.g. yourshop.yourname.testnet</span>
             ) : (
-              <span className="err">Enter a NEAR account, e.g. ms-clothing.yourname.testnet</span>
+              <span className="help">The NEAR testnet account that should receive the money.</span>
             )}
           </label>
           <label className="field">
             Note for the buyer
-            <input value={memo} maxLength={200} onChange={(e) => (setMemo(e.target.value), setCreated(null))} />
+            <input value={memo} maxLength={200} placeholder="Order number or what this is for (optional)" onChange={(e) => (setMemo(e.target.value), setCreated(null))} />
           </label>
 
           <div className="field" role="group" aria-label="Items">
@@ -139,9 +129,9 @@ export default function VendorPage() {
             <div className="items">
               {items.map((it, i) => (
                 <div className="item-row" key={i}>
-                  <input aria-label={`Item ${i + 1} name`} value={it.name} placeholder="Item" onChange={(e) => update(i, { name: e.target.value })} />
+                  <input aria-label={`Item ${i + 1} name`} value={it.name} placeholder="Item name" onChange={(e) => update(i, { name: e.target.value })} />
                   <input aria-label={`Item ${i + 1} quantity`} value={it.quantity} inputMode="numeric" onChange={(e) => update(i, { quantity: e.target.value })} />
-                  <input aria-label={`Item ${i + 1} price in USDC`} value={it.price} inputMode="decimal" onChange={(e) => update(i, { price: e.target.value })} />
+                  <input aria-label={`Item ${i + 1} price in USDC`} value={it.price} placeholder="0.00" inputMode="decimal" onChange={(e) => update(i, { price: e.target.value })} />
                   <button
                     className="icon-btn"
                     aria-label={`Remove item ${i + 1}`}
@@ -159,7 +149,7 @@ export default function VendorPage() {
                 <Plus size={16} aria-hidden /> Add item
               </button>
             )}
-            {!valid && <span className="err">Every item needs a name, a whole quantity (1-999) and a price like 0.15.</span>}
+            {!valid && items.some((x) => x.name || x.price) && <span className="err">Every item needs a name, a whole quantity (1-999) and a price like 0.15.</span>}
             {overCap && <span className="err">Playground invoices are capped at 5 test USDC (the testnet vault’s limit).</span>}
           </div>
 
@@ -168,7 +158,7 @@ export default function VendorPage() {
               {error}
             </div>
           )}
-          <button className="btn btn-honey" onClick={() => void submit()} disabled={!valid || !payoutOk || overCap || busy}>
+          <button className="btn btn-honey" onClick={() => void submit()} disabled={!valid || !payoutOk || overCap || busy || !vendor.trim()}>
             {busy ? "Signing your invoice…" : "Create payment link"} <ArrowRight size={18} aria-hidden />
           </button>
         </div>

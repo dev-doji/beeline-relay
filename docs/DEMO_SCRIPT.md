@@ -34,7 +34,7 @@ Record on the **live site, https://usebeeline.xyz** (not localhost). Everything 
 
 ## 3. A real pay link (0:40 – 1:00)
 
-**Screen:** click **Create a payment link**. Keep the MS Clothing example and the shop's NEAR testnet account. Click **Create payment link**. Show the share buttons (WhatsApp, Facebook, X, Telegram, LinkedIn, email, SMS), then click **Show QR at the counter** to show the in-person version. Optional: scroll to **Or: one permanent link** (one link for a freelancer to keep; the customer chooses the amount).
+**Screen:** click **Create a payment link**. The form starts empty: type a shop name (for example MS Clothing), one item (for example Linen shirt, 1, 0.50) and the shop's NEAR testnet account. Click **Create payment link**. Show the share buttons (WhatsApp, Facebook, X, Telegram, LinkedIn, email, SMS), then click **Show QR at the counter** to show the in-person version. Optional: scroll to **Or: one permanent link** (one link for a freelancer to keep; the customer chooses the amount).
 
 **Voiceover:**
 > A business creates an invoice, and Beeline signs it: who gets paid, and how much.

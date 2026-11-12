@@ -26,7 +26,7 @@ const NEAR = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
  * 4. The panel tracks each leg and labels which provider reported it.
  */
 export function CashOut() {
-  const [amount, setAmount] = useState("5");
+  const [amount, setAmount] = useState("");
   const [quote, setQuote] = useState<CashoutQuote | null>(null);
   const [nearAccount, setNearAccount] = useState("");
   const [bank, setBank] = useState({ bank_code: "", account_number: "", holder_name: "" });
@@ -95,8 +95,8 @@ export function CashOut() {
       </p>
       <label className="field">
         Amount to cash out (USDC)
-        <input value={amount} inputMode="decimal" onChange={(e) => (setAmount(e.target.value), setQuote(null), setPrepared(null), setStatus(null))} />
-        {!amountOk && <span className="err">Enter an amount like 5 or 5.50.</span>}
+        <input value={amount} inputMode="decimal" placeholder="e.g. 5" onChange={(e) => (setAmount(e.target.value), setQuote(null), setPrepared(null), setStatus(null))} />
+        {amount && !amountOk && <span className="err">Enter an amount like 5 or 5.50.</span>}
       </label>
       <button className="btn" disabled={!amountOk || busy !== ""} onClick={() => void run("quote", () => cashoutQuote(amount), setQuote)}>
         {busy === "quote" ? "Getting prices…" : "Get a price (no money moves)"}
