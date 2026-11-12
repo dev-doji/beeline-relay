@@ -168,6 +168,19 @@ The same NEAR → Base `ORIGIN_CHAIN` quote worked on 2026-11-04 (section 6a). A
 
 **Not verified yet:** that 1Click detects an `ft_transfer_call` deposit made *on behalf of* the deposit address as funding an `INTENTS` quote. This needs one small live mainnet payment.
 
+## 6c. Live dry quotes (2026-11-12, no funds moved)
+
+Four dry quotes (`dry: true`, 2 USDC, 1% slippage) to `https://1click.chaindefuser.com/v0/quote`, with placeholder refund and recipient addresses. A Python client with its default User-Agent got HTTP 403 `error code: 1010` (a Cloudflare block on the client signature, not a route answer); a plain custom User-Agent worked.
+
+| Route | Result |
+|---|---|
+| Base USDC to NEAR USDC, `depositType: ORIGIN_CHAIN`, `recipientType: DESTINATION_CHAIN` (a normal NEAR USDC balance) | 201, `amountOut` 1995306 (min 1975352), about 35 s. **This was a 400 on 2026-11-05.** |
+| Base USDC to NEAR USDC, `recipientType: INTENTS` (credited inside `intents.near`) | 201, `amountOut` 1999596, about 35 s |
+| NEAR USDC to Base USDC, `depositType: INTENTS`, `refundType: INTENTS` (the vault's rail) | 201, `amountOut` 1997196, about 12 s |
+| NEAR USDC to Base USDC, `depositType: ORIGIN_CHAIN` (plain `ft_transfer`) | 201, `amountOut` 1997196, about 22 s. **This was a 400 on 2026-11-05.** |
+
+So the 2026-11-05 refusals of NEAR-chain deposits and of native NEAR delivery were not lasting. Dry quotes only prove pricing: whether a funded deposit is detected and paid out is still unverified (docs/REAL_MONEY_TEST.md). Whether a recipient NEAR account must hold a USDC `storage_deposit` before receiving is still open.
+
 ## 7. Open questions to settle on Day 1–2
 1. Is a partner JWT required for non-dry quotes or status in practice? (Dry quotes and status work without one today.)
 2. Where is the 1Click signing public key published, so we can verify quote signatures in Go?
