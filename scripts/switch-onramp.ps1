@@ -56,6 +56,7 @@ if (-not $key) {
   $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
   try { $key = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
 }
+$key = if ($key) { $key.Trim().Trim('"').Trim("'") } else { $key }
 if (-not $key) { throw 'No key entered.' }
 $headers = @{ 'x-service-key' = $key; 'Accept' = 'application/json' }
 
@@ -64,9 +65,15 @@ function Call($method, $path, $body) {
   if ($body) { $args.Body = ($body | ConvertTo-Json -Depth 6); $args.ContentType = 'application/json' }
   try { return Invoke-RestMethod @args }
   catch {
-    $msg = $_.Exception.Message
-    try { $msg = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() } catch {}
-    throw "Switch refused or failed ($method $path): $msg"
+    # Windows PowerShell 5.1 keeps the response body in ErrorDetails; fall back to the stream, then to the plain message.
+    $status = ''
+    try { $status = [int]$_.Exception.Response.StatusCode } catch {}
+    $body = $_.ErrorDetails.Message
+    if (-not $body) { try { $body = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() } catch {} }
+    if (-not $body) { $body = $_.Exception.Message }
+    $hint = ''
+    if ($status -eq 401 -or $status -eq 403) { $hint = ' (the key was refused: check it is the live service key from the Switch dashboard, copied without spaces, and that this product is enabled for your account)' }
+    throw "Switch returned HTTP $status for $method $path`: $body$hint"
   }
 }
 
