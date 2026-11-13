@@ -124,7 +124,7 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
       )}
       <div className="ck-chip">
         <i className={real ? "real" : ""} />
-        {live ? `${live.symbol} on ${live.chain_name}` : real ? "USDC on NEAR · real money" : "Test USDC on NEAR testnet · no real money"}
+        {live ? `${live.symbol} on ${live.chain_name}` : real ? "Real money · pay from any network" : "Test USDC on NEAR testnet · no real money"}
       </div>
 
       {paid ? (
@@ -190,8 +190,8 @@ function ChoosePay({ real, onPick }: { real: boolean; onPick: (m: "wallet" | "qr
       <div className="ck-hint">
         {real ? (
           <>
-            Scan with <b>Binance, Bybit, Tokkenly, MetaMask, Trust</b> or any wallet on Base, Ethereum, BNB Chain, Solana, Tron, TON and more. NEAR Intents delivers it to the seller
-            as USDC on NEAR. Either way the seller is paid and you get a receipt.
+            <b>You do not need a NEAR wallet.</b> Pick the network you hold money on (Base, Ethereum, BNB Chain, Solana, Tron, TON and more), then scan or copy the address with
+            Binance, Bybit, Tokkenly, MetaMask, Trust or any wallet. NEAR Intents converts it behind the scenes and the seller receives USDC on NEAR. You get a receipt.
           </>
         ) : (
           <>
