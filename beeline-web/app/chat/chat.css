@@ -133,6 +133,17 @@
 .cx-box details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--cx-soft-ink); }
 .cx-link { font-size: 13px; color: var(--cx-ink); }
 
+/* Vendor invoice view */
+.cx-back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 0; background: transparent; font-size: 12.5px; color: var(--cx-desc); border-radius: 8px; }
+.cx-back:hover { background: var(--cx-hover); color: var(--cx-ink); }
+.cx-detail { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.cx-detail-main, .cx-detail-side { display: grid; gap: 12px; min-width: 0; }
+.cx-sec { display: inline-flex; align-items: center; gap: 7px; font-size: 14px !important; }
+.cx-small { margin: 0; font-size: 12.5px; line-height: 1.55; }
+.cx-link-btn { justify-self: start; border: 0; background: transparent; padding: 0; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font: inherit; font-size: 13px; }
+.cx-recent-item { width: 100%; border: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+@media (max-width: 900px) { .cx-detail { grid-template-columns: minmax(0, 1fr); } }
+
 /* Composer and "/" menu */
 .cx-dock { position: relative; flex: none; width: min(760px, calc(100% - 48px)); margin: 0 auto; padding: 0 0 14px; }
 .cx-composer { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 12px; background: #fff; border: 0.8px solid var(--cx-line); border-radius: 999px;

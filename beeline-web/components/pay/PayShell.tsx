@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Radar } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import "./pay.css";
 
@@ -20,9 +19,6 @@ export function PayShell({ children }: { children: React.ReactNode }) {
           Beeline
         </Link>
         <span className="px-spacer" />
-        <Link href="/attacks" className="px-link">
-          <Radar size={14} aria-hidden /> Attack log
-        </Link>
         <Link href="/chat" className="px-btn dark sm">
           Open the app
         </Link>

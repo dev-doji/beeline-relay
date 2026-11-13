@@ -25,9 +25,10 @@ import {
 import { BeeMark } from "@/components/BeeMark";
 import { ShareLink } from "@/components/invoice/ShareLink";
 import { CashOut } from "@/components/invoice/CashOut";
+import { InvoiceDetail } from "./InvoiceDetail";
 import { ApiError, type ChatMessage, type Invoice, type Profile, formatUSDC, shortKey } from "@/lib/api";
 
-type View = "welcome" | "chat" | "invoices" | "cash";
+type View = "welcome" | "chat" | "invoices" | "invoice" | "cash";
 type Icon = ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
 type Action = {
   id: string;
@@ -52,8 +53,6 @@ const ACTIONS: Action[] = [
 ];
 
 const PERMANENT = /\/pay\/to\?[^\s)]+/;
-
-const dare = (vendor: string, link: string) => `Can you trick my AI payment agent into paying you instead of ${vendor}? Try anything: ${link}`;
 
 function BeeAvatar({ size = 30 }: { size?: number }) {
   return (
@@ -101,6 +100,7 @@ export function ChatApp({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>("welcome");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   // null = automatic: open on desktop, closed on phones (decided by CSS). A click overrides it.
   const [side, setSide] = useState<boolean | null>(null);
   const [slash, setSlash] = useState(false);
@@ -175,6 +175,12 @@ export function ChatApp({
     }
   }
 
+  function openInvoice(id: string) {
+    setSelectedId(id);
+    setView("invoice");
+    if (window.innerWidth < 860) setSide(false);
+  }
+
   function run(a: Action) {
     setSlash(false);
     if (a.view) return setView(a.view);
@@ -241,13 +247,13 @@ export function ChatApp({
         <div className="cx-recent">
           {invoices.length === 0 && <span className="cx-muted cx-pad">No invoices yet.</span>}
           {invoices.slice(0, 12).map((i) => (
-            <Link key={i.id} href={`/pay/${i.id}`} className="cx-recent-item">
+            <button key={i.id} className="cx-recent-item" onClick={() => openInvoice(i.id)}>
               <b>{formatUSDC(i.amount)} USDC</b>
               <span>
                 <i className={i.status === "paid" ? "dot ok" : "dot"} aria-hidden />
                 {i.status === "paid" ? "paid" : "open"} · {new Date(i.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
               </span>
-            </Link>
+            </button>
           ))}
         </div>
 
@@ -353,7 +359,7 @@ export function ChatApp({
                             <b>{formatUSDC(inv.amount)} USDC</b>
                             <StatusTag status={inv.status} />
                           </div>
-                          <ShareLink id={inv.id} link={link} vendor={inv.vendor_name} amountLabel={`${formatUSDC(inv.amount)} USDC`} dareText={dare(inv.vendor_name, link)} />
+                          <ShareLink id={inv.id} link={link} vendor={inv.vendor_name} amountLabel={`${formatUSDC(inv.amount)} USDC`} dareText="" />
                         </div>
                       )}
                     </div>
@@ -391,14 +397,18 @@ export function ChatApp({
                       <span className="cx-muted">{i.items.map((x) => x.name).join(", ") || i.memo || "Invoice"}</span>
                       <details>
                         <summary>Share</summary>
-                        <ShareLink id={i.id} link={link} vendor={i.vendor_name} amountLabel={`${formatUSDC(i.amount)} USDC`} dareText={dare(i.vendor_name, link)} />
+                        <ShareLink id={i.id} link={link} vendor={i.vendor_name} amountLabel={`${formatUSDC(i.amount)} USDC`} dareText="" />
                       </details>
-                      <Link className="cx-link" href={`/pay/${i.id}`}>Open the pay page</Link>
+                      <button className="cx-link cx-link-btn" onClick={() => openInvoice(i.id)}>View details and security events</button>
                     </div>
                   );
                 })}
               </div>
             </div>
+          )}
+
+          {view === "invoice" && selectedId && byId.get(selectedId) && (
+            <InvoiceDetail invoice={byId.get(selectedId)!} onBack={() => setView("invoices")} />
           )}
 
           {view === "cash" && (

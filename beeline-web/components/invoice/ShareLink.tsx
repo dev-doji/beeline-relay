@@ -105,9 +105,11 @@ export function ShareLink({
         <Link className="btn btn-honey" href={id ? `/pay/${id}` : link}>
           Open the pay page <ExternalLink size={16} aria-hidden />
         </Link>
-        <button className="btn ghost" onClick={() => setDare((d) => !d)}>
-          {dare ? "Use the payment message" : "Dare a friend to trick it instead"}
-        </button>
+        {dareText && (
+          <button className="btn ghost" onClick={() => setDare((d) => !d)}>
+            {dare ? "Use the payment message" : "Dare a friend to trick it instead"}
+          </button>
+        )}
       </div>
 
       {counter && (
