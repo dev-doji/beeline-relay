@@ -28,7 +28,7 @@ Captured on 2026-11-13 from the live site ([usebeeline.xyz](https://usebeeline.x
 |---|---|
 | ![Landing page](docs/screenshots/landing.png) | ![Sign-in screen with Bee](docs/screenshots/sign-in.png) |
 
-| What a customer sees: a signed invoice and one way to pay (a test invoice here; real-money invoices show a QR code instead, not pictured because they are switched off on the live site) | One permanent pay link |
+| The customer checkout: one card with the merchant, invoice and amount (a test invoice here; a real-money invoice adds network choice, a QR code and an address to copy, not pictured because real-money invoices are switched off on the live site) | One permanent pay link |
 |---|---|
 | ![Customer pay page](docs/screenshots/pay-page.png) | ![Permanent pay link](docs/screenshots/permanent-link.png) |
 
