@@ -142,6 +142,9 @@
 .cx-plus:hover { color: var(--cx-ink); background: var(--cx-hover); }
 .cx-composer textarea { flex: 1; min-width: 0; border: 0; outline: 0; resize: none; background: transparent; font: inherit; font-size: 14px; max-height: 140px; padding: 7px 4px; color: var(--cx-ink); }
 .cx-composer textarea::placeholder { color: var(--cx-muted); }
+/* The pill shows the focus ring (via :focus-within); the inner text area must not draw its own box. */
+.cx-shell .cx-composer textarea:focus,
+.cx-shell .cx-composer textarea:focus-visible { outline: none; box-shadow: none; border-radius: 0; }
 .cx-send { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--cx-ink); color: #fff; transition: transform 0.15s var(--ease-out); }
 .cx-send:not(:disabled):hover { transform: scale(1.06); }
 .cx-send:disabled { opacity: 0.28; cursor: default; }
