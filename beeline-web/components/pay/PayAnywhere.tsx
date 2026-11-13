@@ -180,7 +180,7 @@ export function PayAnywhere({ invoice, onPaid }: { invoice: Invoice; onPaid: () 
             {quote.deposit_memo && <CopyRow label="Memo" value={quote.deposit_memo} />}
             <p className="px-fine">
               Scan with your wallet or exchange, or copy the address. Send only {quote.symbol} on {quote.chain_name}: other tokens or networks can be lost.
-              This address is for this invoice only.
+              This address is for this invoice only. Some exchanges take their withdrawal fee out of the amount you enter: make sure the address receives at least {quote.amount_in} {quote.symbol}, or it will be refunded.
             </p>
             <ol className="px-steps" aria-label="Payment progress">
               {STEPS.map((s, i) => (
