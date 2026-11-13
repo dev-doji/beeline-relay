@@ -15,7 +15,7 @@ export function PayShell({ children }: { children: React.ReactNode }) {
       <header className="px-top">
         <Link href="/" className="px-brand" aria-label="Beeline home">
           <span className="px-logo">
-            <BeeMark size={16} />
+            <BeeMark size={16} onDark />
           </span>
           Beeline
         </Link>

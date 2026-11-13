@@ -14,7 +14,7 @@ export function SiteHeader() {
     <header className="lp-wrap pnav-shell">
       <div className="pnav">
         <Link href="/" className="pnav-logo" aria-label="Beeline home">
-          <BeeMark size={26} />
+          <BeeMark size={26} onDark />
         </Link>
         <span className="pnav-name">Beeline</span>
         <span className="pnav-line" aria-hidden>

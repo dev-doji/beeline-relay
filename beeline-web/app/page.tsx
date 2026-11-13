@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDown, ArrowRight, ArrowUpRight, Ban, Check, Cpu, FileSignature, Github, ListChecks, Repeat, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight, Ban, Check, Cpu, FileSignature, Github, ListChecks, Network, Repeat, ShieldCheck, Wallet } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { LiveStats } from "@/components/landing/LiveStats";
 import { REPO_URL } from "@/lib/api";
@@ -194,7 +194,7 @@ export default function Home() {
       <section className="lp-wrap lp-built">
         <span className="cap">built on</span>
         <div className="marks">
-          <span><BeeMark size={18} /> NEAR Protocol</span>
+          <span><Network size={18} aria-hidden /> NEAR Protocol</span>
           <span><Cpu size={18} aria-hidden /> NEAR AI Cloud</span>
           <span><ArrowUpRight size={18} aria-hidden /> NEAR Intents</span>
           <span><ShieldCheck size={18} aria-hidden /> TEE attestation</span>

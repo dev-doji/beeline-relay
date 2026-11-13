@@ -1,0 +1,39 @@
+{
+  "brand": "Beeline",
+  "tagline": "Get paid. Fraud gets blocked.",
+  "brief": "Beeline is a point of sale on NEAR for any business, online or in the shop. A business asks an AI assistant for an invoice, shares the pay link on any app, and a NEAR vault pays only the exact payee and amount on the signed invoice. The mark must say exact and direct, work at 16 px and in one colour, and stand apart from blue fintech.",
+  "adjectives": ["exact", "direct", "protected", "warm", "modern"],
+  "criteria": "Success: recognisable at 16 px, works in one colour, ownable in payments (honey and ink, not blue), and says exact match rather than drawing a bee or a shield.",
+  "industry": "fintech",
+  "nav": ["Payments", "Attack log", "Sign in"],
+  "brand_color": "#F5C451",
+  "tile_color": "#16162A",
+  "greyscale": false,
+  "final": true,
+  "designer": "Beeline",
+  "label": "Final design",
+  "concepts": [
+    {
+      "name": "Exact fit",
+      "symbol": "beeline-symbol.svg",
+      "lockup": "beeline-horizontal.svg",
+      "stacked": "beeline-stacked.svg",
+      "symbol_on_tile": "beeline-symbol-small-reversed.svg",
+      "symbol_on_dark": "beeline-symbol-reversed.svg",
+      "lockup_on_dark": "beeline-horizontal-reversed.svg",
+      "stacked_on_dark": "beeline-stacked-reversed.svg",
+      "idea": "A line fits a notch in a honey cell exactly: the exact payee and the exact amount.",
+      "rationale": [
+        "The notch and the line are concentric, so the mark reads as an exact match, which is what the vault enforces",
+        "Honey and ink is ownable in payments, where blue dominates; no bee cartoon, shield or arrow",
+        "One hexagon, one line, one corner radius; the wordmark uses the same 24 unit line and a honey hexagon for the i dot"
+      ]
+    }
+  ],
+  "recommendation": "Exact fit: the symbol survives 16 px (small cut), one colour and reversed, and it carries the product's promise.",
+  "next_steps": [
+    "Run a trademark and reverse-image search before launch",
+    "Outline the wordmark strokes in Illustrator or Inkscape for print",
+    "Swap the mark into the site, favicon and app icons"
+  ]
+}

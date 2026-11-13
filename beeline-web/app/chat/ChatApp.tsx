@@ -58,7 +58,7 @@ const dare = (vendor: string, link: string) => `Can you trick my AI payment agen
 function BeeAvatar({ size = 30 }: { size?: number }) {
   return (
     <span className="cx-av" style={{ width: size, height: size }} aria-hidden>
-      <BeeMark size={Math.round(size * 0.62)} />
+      <BeeMark size={Math.round(size * 0.62)} onDark />
     </span>
   );
 }
@@ -209,7 +209,7 @@ export function ChatApp({
       <aside className="cx-side" aria-label="Navigation">
         <div className="cx-side-head">
           <Link href="/" className="cx-brand" aria-label="Beeline home">
-            <span className="cx-logo"><BeeMark size={16} /></span>
+            <span className="cx-logo"><BeeMark size={16} onDark /></span>
             <span>Beeline</span>
           </Link>
           <button className="cx-icon" aria-label="Close sidebar" onClick={() => setSide(false)}>
