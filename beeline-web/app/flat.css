@@ -1,0 +1,37 @@
+/* The flat layer. One look across the landing page, the chat app, the checkout and the receipt: square corners, 1px
+   hairline borders, no shadows, no lifting hover effects, solid buttons. It is loaded for every page and uses
+   !important on purpose, so it wins over the older page stylesheets without rewriting them one rule at a time.
+   Round things that mean something (the loading spinner, the typing dots, the live dot, the circular "dare" stamp
+   graphic) stay round. */
+
+:root { --flat-line: #e6e6ee; }
+
+/* ---------- Landing page ---------- */
+.pnav, .pnav-links a, .pnav-logo, .pbtn, .tag, .tile, .t-chat, .t-art, .t-block, .t-chat .inject, .bcard, .bcard .l-ic,
+.chip, .art-limit .bar, .art-limit .bar span, .art-once .l-tx, .stamp-mini, .snum, .pcard, .pstate, .lp-band, .lp .code,
+.l-bigic, .btn, .pill-btn, .panel, .stat-card, .alert, .field input, .field textarea {
+  border-radius: 0 !important;
+}
+.pbtn:hover, .bcard:hover, .spin-badge, .panel, .stat-card { box-shadow: none !important; }
+.pbtn:hover, .bcard:hover { transform: none !important; }
+.pnav, .tag, .t-block, .bcard, .pcard, .panel, .stat-card { border-width: 1px !important; }
+.bcard, .pcard, .t-block, .panel, .stat-card { border-color: var(--flat-line) !important; }
+.bcard:hover { border-color: #16162a !important; }
+
+/* ---------- Chat app ---------- */
+.cx-logo, .cx-icon, .cx-nav-item, .cx-recent-item, .cx-acct, .cx-user-av, .cx-menu, .cx-menu button, .cx-pill, .cx-card, .cx-card-ic,
+.cx-get, .cx-hint kbd, .cx-bubble, .cx-av, .cx-box, .cx-tag, .cx-back, .cx-events li, .cx-composer, .cx-plus, .cx-send, .cx-slash,
+.cx-slash button, .cx-stat, .cx-ledger-list, .cx-verdict, .cx-shell :focus-visible {
+  border-radius: 0 !important;
+}
+.cx-card, .cx-card:hover, .cx-box, .cx-composer, .cx-menu, .cx-slash, .cx-shell.side-open .cx-side { box-shadow: none !important; }
+.cx-card:hover { transform: none !important; border-color: #16162a !important; }
+.cx-composer:focus-within { box-shadow: none !important; border-color: #16162a !important; }
+
+/* Uniform cards: the same white surface and 1px line everywhere, like the receipt. */
+.cx-card, .cx-box, .cx-stat, .cx-ledger-list, .cx-menu, .cx-slash, .cx-composer { background: #fff !important; border: 1px solid var(--flat-line) !important; }
+.cx-events li { border: 1px solid #f2c4c0 !important; }
+
+/* Solid, square buttons. */
+.cx-pill, .cx-get, .cx-send { background: #16162a !important; color: #fff !important; }
+.cx-pill:hover, .cx-get:hover, .cx-send:hover { opacity: 0.88; }

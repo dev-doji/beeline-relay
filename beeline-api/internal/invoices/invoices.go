@@ -34,8 +34,9 @@ const MaxAmount = 1_000_000_000
 // MainnetUSDC is Circle's native USDC on NEAR mainnet: the one asset a real-money invoice is paid in.
 const MainnetUSDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"
 
-// DefaultMainnetMax caps a real-money invoice (base units, 6 decimals) while Beeline is in early access: 25 USDC.
-const DefaultMainnetMax = 25_000_000
+// DefaultMainnetMax caps a real-money invoice (base units, 6 decimals) while Beeline is in early access: 1.5 USDC,
+// enough for a first real test (about 2,000 naira) and a small loss if the unverified real-money path misbehaves.
+const DefaultMainnetMax = 1_500_000
 
 // NetworkOf says which NEAR network an invoice's asset lives on.
 func NetworkOf(asset string) string {
@@ -131,7 +132,13 @@ func (s *Service) Check(in *CreateInput) (string, error) {
 	return Validate(in)
 }
 
-func formatMax(units int64) string { return fmt.Sprintf("%d", units/1_000_000) }
+func formatMax(units int64) string {
+	whole, frac := units/1_000_000, units%1_000_000
+	if frac == 0 {
+		return fmt.Sprintf("%d", whole)
+	}
+	return strings.TrimRight(fmt.Sprintf("%d.%06d", whole, frac), "0")
+}
 
 // IssuerPublicKeyHex is the key the vault owner registers with set_invoice_issuer.
 func (s *Service) IssuerPublicKeyHex() string {

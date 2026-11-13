@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./slick.css";
+import "./flat.css";
 import { SiteHeader } from "@/components/SiteHeader";
 
 

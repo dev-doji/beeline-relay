@@ -56,3 +56,19 @@ func TestRealInvoiceNeedsAMainnetPayout(t *testing.T) {
 		t.Fatalf("a mainnet payout is fine: %v", err)
 	}
 }
+
+func TestRealInvoiceCapIsOnePointFiveUSDCAndSaysSo(t *testing.T) {
+	svc := &Service{MainnetEnabled: true}
+	in := valid()
+	in.Real = true
+	in.Payout = "ms-clothing.near"
+	in.Items = []Item{{Name: "Thing", Quantity: 1, UnitPrice: "1500000"}}
+	if _, err := svc.Check(&in); err != nil {
+		t.Fatalf("exactly 1.5 USDC is allowed: %v", err)
+	}
+	in.Items[0].UnitPrice = "1500001"
+	_, err := svc.Check(&in)
+	if err == nil || !strings.Contains(err.Error(), "1.5 USDC") {
+		t.Fatalf("one unit over must be refused and name the cap: %v", err)
+	}
+}
