@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Copy, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { PayAnywhere } from "./PayAnywhere";
 import { ApiError, type Invoice, claimPayment, formatUSDC, invoiceMemo, tokenContract } from "@/lib/api";
 
@@ -10,43 +10,17 @@ type Phase = { kind: "idle" } | { kind: "working"; text: string } | { kind: "pro
 const GAS = "30000000000000"; // 30 Tgas, plenty for one ft_transfer
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function CopyRow({ label, value, show }: { label: string; value: string; show?: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="px-copy">
-      <span className="px-copy-label">{label}</span>
-      <code title={value}>{show ?? value}</code>
-      <button
-        type="button"
-        className="px-copy-btn"
-        aria-label={`Copy ${label}`}
-        onClick={() => {
-          void navigator.clipboard?.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1400);
-        }}
-      >
-        {copied ? <Check size={13} aria-hidden /> : <Copy size={13} aria-hidden />}
-      </button>
-    </div>
-  );
-}
-
 /**
- * How a customer pays from their own wallet. Both ways end the same: the server reads the transaction from
- * NEAR and only a matching, final payment marks the invoice paid (docs/PAYMENT_FLOW.md). The wallet's own
- * "success" screen and anything typed here count for nothing until then.
+ * How a customer pays. A real-money invoice leads with "pay from any wallet or exchange" (scan a QR code, nothing
+ * to paste back) and offers a NEAR wallet as the other way. Either way the server decides: the wallet path reads
+ * the transaction from NEAR, the QR path needs NEAR Intents' delivery plus the vendor's balance rising. Nothing the
+ * browser says marks an invoice paid (docs/PAYMENT_FLOW.md).
  */
-export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoice; onPaid: () => void; onDemo: () => void; demoBusy: boolean }) {
+export function PaySheet({ invoice, onPaid }: { invoice: Invoice; onPaid: () => void }) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  const [sender, setSender] = useState("");
-  const [hash, setHash] = useState("");
   const running = useRef(false);
 
   const real = invoice.network === "mainnet";
-  const demoOk = /^\d+$/.test(invoice.amount) && BigInt(invoice.amount) <= BigInt(5_000_000); // the shared test vault's per-payment limit
-  const token = tokenContract(invoice.asset);
-  const memo = invoiceMemo(invoice.id);
   const working = phase.kind === "working";
 
   // Asks the server until it says verified, refuses, or a minute and a half has passed.
@@ -66,10 +40,7 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
       }
       await sleep(3000);
     }
-    setPhase({
-      kind: "problem",
-      text: "We could not confirm this payment on NEAR yet. If you paid, your transaction is safe on the chain: paste its hash below in a minute.",
-    });
+    setPhase({ kind: "problem", text: "We could not confirm this payment on NEAR yet. If it went through, it will show here shortly. Reload this page in a minute." });
   }
 
   async function payWithWallet() {
@@ -86,11 +57,11 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
       setPhase({ kind: "working", text: "Approve the payment in your wallet…" });
       const outcome = await wallet.signAndSendTransaction({
         signerId: account,
-        receiverId: token,
+        receiverId: tokenContract(invoice.asset),
         actions: [
           {
             type: "FunctionCall",
-            params: { methodName: "ft_transfer", args: { receiver_id: invoice.payout, amount: invoice.amount, memo }, gas: GAS, deposit: "1" },
+            params: { methodName: "ft_transfer", args: { receiver_id: invoice.payout, amount: invoice.amount, memo: invoiceMemo(invoice.id) }, gas: GAS, deposit: "1" },
           },
         ],
       });
@@ -100,24 +71,12 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
       setPhase({ kind: "working", text: "Confirming on NEAR. This takes a few seconds…" });
       await confirm(txHash, account);
     } catch {
-      setPhase({ kind: "problem", text: "The payment was not completed in your wallet, so nothing was charged. You can try again, or send it from any wallet below." });
+      setPhase({ kind: "problem", text: "The payment was not completed in your wallet, so nothing was charged. You can try again." });
     } finally {
       running.current = false;
     }
   }
 
-  async function claimManual() {
-    if (running.current) return;
-    running.current = true;
-    try {
-      setPhase({ kind: "working", text: "Checking NEAR…" });
-      await confirm(hash.trim(), sender.trim().toLowerCase());
-    } finally {
-      running.current = false;
-    }
-  }
-
-  const manualOk = hash.trim().length >= 43 && sender.trim().length >= 2;
   return (
     <div className="px-sheet">
       {real && (
@@ -127,58 +86,22 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
       )}
 
       <section className="px-sheet-sec">
-        <b>{real ? "Or pay from your NEAR wallet" : "Pay from your NEAR wallet"}</b>
-        <button className="px-btn dark full" onClick={() => void payWithWallet()} disabled={working || demoBusy}>
-          {working ? <Loader2 size={15} className="px-spin" aria-hidden /> : null} Connect wallet and pay {formatUSDC(invoice.amount)} USDC
+        {real && <b>Or pay from a NEAR wallet</b>}
+        <button className={real ? "px-btn full" : "px-btn dark full"} onClick={() => void payWithWallet()} disabled={working}>
+          {working ? <Loader2 size={15} className="px-spin" aria-hidden /> : null}
+          {real ? "Connect a NEAR wallet" : `Pay ${formatUSDC(invoice.amount)} test USDC with a NEAR testnet wallet`}
         </button>
+        {phase.kind === "working" && (
+          <div className="px-status" role="status">
+            <Loader2 size={14} className="px-spin" aria-hidden /> {phase.text}
+          </div>
+        )}
+        {phase.kind === "problem" && (
+          <div className="alert" role="alert">
+            {phase.text}
+          </div>
+        )}
       </section>
-
-      <section className="px-sheet-sec">
-        <b>{real ? "Or send USDC on NEAR yourself" : "Or send from any wallet or exchange"}</b>
-        <p>Send exactly this, with this memo. Without the memo we cannot match the payment to this invoice.</p>
-        <CopyRow label="Send to" value={invoice.payout} />
-        <CopyRow label="Amount" value={formatUSDC(invoice.amount)} show={`${formatUSDC(invoice.amount)} USDC`} />
-        <CopyRow label="Token" value={token} />
-        <CopyRow label="Memo" value={memo} />
-        <div className="px-grid2 tight">
-          <label className="px-in">
-            <span>Your NEAR account</span>
-            <input value={sender} spellCheck={false} placeholder="you.near" onChange={(e) => setSender(e.target.value)} />
-          </label>
-          <label className="px-in">
-            <span>Transaction hash</span>
-            <input value={hash} spellCheck={false} placeholder="paste it after you pay" onChange={(e) => setHash(e.target.value)} />
-          </label>
-        </div>
-        <button className="px-btn full" onClick={() => void claimManual()} disabled={!manualOk || working}>
-          I have sent it
-        </button>
-      </section>
-
-      {phase.kind === "working" && (
-        <div className="px-status" role="status">
-          <Loader2 size={14} className="px-spin" aria-hidden /> {phase.text}
-        </div>
-      )}
-      {phase.kind === "problem" && (
-        <div className="alert" role="alert">
-          {phase.text}
-        </div>
-      )}
-
-      {!real && !demoOk && (
-        <section className="px-sheet-sec">
-          <p>The shared test vault pays at most 5 test USDC, so the Demo payment is off for this invoice. Pay it from a NEAR testnet wallet above.</p>
-        </section>
-      )}
-      {!real && demoOk && (
-        <section className="px-sheet-sec demo">
-          <button className="px-btn sm" onClick={onDemo} disabled={working || demoBusy}>
-            {demoBusy ? "Paying…" : "Demo payment"}
-          </button>
-          <span>No wallet? A test agent pays from Beeline’s shared test vault. Testnet only.</span>
-        </section>
-      )}
     </div>
   );
 }

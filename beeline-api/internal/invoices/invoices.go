@@ -119,6 +119,9 @@ func (s *Service) Check(in *CreateInput) (string, error) {
 		if !s.MainnetEnabled {
 			return "", errors.New("real-money invoices are not switched on yet")
 		}
+		if strings.HasSuffix(strings.ToLower(strings.TrimSpace(in.Payout)), ".testnet") {
+			return "", errors.New("a real-money invoice needs a mainnet NEAR account to receive the money (for example you.near), not a testnet one")
+		}
 		max := s.MainnetMax
 		if max <= 0 {
 			max = DefaultMainnetMax

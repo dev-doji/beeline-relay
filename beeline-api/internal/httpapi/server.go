@@ -75,6 +75,13 @@ type Deps struct {
 	ClaimsMainnet ClaimVerifier
 	// PayIn lets customers pay a real-money invoice from any chain through NEAR Intents; nil disables it.
 	PayIn *payin.Service
+	// Storage checks that a mainnet account can hold USDC (is registered with the token contract); nil skips the check.
+	Storage StorageChecker
+}
+
+// StorageChecker is a read-only NEP-145 registration check on NEAR mainnet.
+type StorageChecker interface {
+	StorageRegistered(ctx context.Context, token, account string) (bool, error)
 }
 
 func NewRouter(d Deps) http.Handler {

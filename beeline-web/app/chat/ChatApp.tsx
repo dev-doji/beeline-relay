@@ -46,6 +46,7 @@ type Action = {
 const ACTIONS: Action[] = [
   { id: "shop", icon: Store, title: "Set up your shop", sub: "Account", desc: "Tell me your shop name and the NEAR account that gets paid.", note: "Start here", send: "Set up my shop" },
   { id: "invoice", icon: FileText, title: "Make an invoice", sub: "Invoices", desc: "Say what you are billing and I make a signed pay link to share.", note: "Most used", prefill: "Invoice 25 for " },
+  { id: "real", icon: FileText, title: "Real-money invoice", sub: "Invoices", desc: "Real USDC on NEAR, paid from any wallet or exchange with a QR code.", note: "Mainnet", prefill: "Make a real invoice for 2 USDC for " },
   { id: "permanent", icon: Link2, title: "Permanent pay link", sub: "Payment links", desc: "One link to keep. Each customer chooses the amount.", note: "Keep forever", send: "Give me a permanent pay link" },
   { id: "list", icon: ListChecks, title: "Show my invoices", sub: "Invoices", desc: "See your invoices and which ones are paid.", note: "Anytime", send: "Show my invoices" },
   { id: "cash", icon: Landmark, title: "Cash out to bank", sub: "Cash out", desc: "Turn USDC into naira in a Nigerian bank account.", note: "Price preview", view: "cash" },

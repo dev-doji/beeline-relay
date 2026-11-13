@@ -197,3 +197,11 @@
 .px-steps li.done { color: var(--px-desc); }
 .px-steps li.done::before { content: "✓ "; color: #1f9d55; }
 @media (max-width: 640px) { .px-in select { font-size: 16px; } }
+
+/* QR payment view */
+.px-qr { display: grid; justify-items: center; gap: 10px; padding: 6px 0 2px; }
+.px-qr-box { padding: 8px; background: #fff; border: 0.8px solid var(--px-line); border-radius: 12px; line-height: 0; }
+.px-qr-amt { display: grid; gap: 1px; text-align: center; font-size: 12px; color: var(--px-muted); }
+.px-qr-amt b { font-size: 20px; font-weight: 700; color: var(--px-ink); letter-spacing: -0.01em; }
+.px-qr-amt span b { font-size: 12.5px; font-weight: 600; }
+.px-qr-amt em { font-style: normal; }

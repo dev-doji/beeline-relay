@@ -43,3 +43,16 @@ func TestValidateRejectsBadInput(t *testing.T) {
 		t.Fatalf("cap message: %v", err)
 	}
 }
+
+func TestRealInvoiceNeedsAMainnetPayout(t *testing.T) {
+	svc := &Service{MainnetEnabled: true}
+	in := valid()
+	in.Real = true // valid() pays out to a .testnet account
+	if _, err := svc.Check(&in); err == nil || !strings.Contains(err.Error(), "mainnet") {
+		t.Fatalf("a real invoice to a testnet account must be refused: %v", err)
+	}
+	in.Payout = "ms-clothing.near"
+	if _, err := svc.Check(&in); err != nil {
+		t.Fatalf("a mainnet payout is fine: %v", err)
+	}
+}

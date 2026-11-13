@@ -37,3 +37,25 @@ func (b *BalanceReader) FTBalance(ctx context.Context, token, account string) (*
 	}
 	return n, nil
 }
+
+// StorageRegistered reports whether account is registered with the token contract (NEP-145 storage_balance_of).
+// A NEP-141 token cannot be held by an unregistered account, so a transfer to one can fail.
+func (b *BalanceReader) StorageRegistered(ctx context.Context, token, account string) (bool, error) {
+	args, _ := json.Marshal(map[string]string{"account_id": account})
+	var out struct {
+		Result []byte `json:"result"`
+		Error  string `json:"error"`
+	}
+	err := b.RPC.Call(ctx, "query", map[string]any{
+		"request_type": "call_function", "finality": "final", "account_id": token,
+		"method_name": "storage_balance_of", "args_base64": base64.StdEncoding.EncodeToString(args),
+	}, &out)
+	if err != nil {
+		return false, err
+	}
+	if out.Error != "" {
+		return false, errors.New("storage_balance_of: " + out.Error)
+	}
+	s := strings.TrimSpace(string(out.Result))
+	return s != "" && s != "null", nil
+}
