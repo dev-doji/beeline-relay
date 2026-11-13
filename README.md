@@ -28,13 +28,11 @@ Captured on 2026-11-13 from the live site ([usebeeline.xyz](https://usebeeline.x
 |---|---|
 | ![Landing page](docs/screenshots/landing.png) | ![Sign-in screen with Bee](docs/screenshots/sign-in.png) |
 
-| What a customer sees: a signed invoice | Paying it: NEAR wallet or any wallet |
+| What a customer sees: a signed invoice and one way to pay (a test invoice here; real-money invoices show a QR code instead, not pictured because they are switched off on the live site) | One permanent pay link |
 |---|---|
-| ![Customer pay page](docs/screenshots/pay-invoice.png) | ![Pay sheet](docs/screenshots/pay-sheet.png) |
+| ![Customer pay page](docs/screenshots/pay-page.png) | ![Permanent pay link](docs/screenshots/permanent-link.png) |
 
-| One permanent pay link | Security test (a scam message typed in, not submitted) |
-|---|---|
-| ![Permanent pay link](docs/screenshots/permanent-link.png) | ![Security test page](docs/screenshots/security-test.png) |
+![Security test page: a scam message typed in, not submitted](docs/screenshots/security-test.png)
 
 ![Public attack log](docs/screenshots/attack-log.png)
 
