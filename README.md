@@ -18,6 +18,8 @@ AI agents are starting to take paid work, and to pay each other, services and pe
 **Try it live:** [usebeeline.xyz](https://usebeeline.xyz) (website, on Vercel) · API: [beeline-api-z3tu.onrender.com/api/v1/health](https://beeline-api-z3tu.onrender.com/api/v1/health) (on Render's free plan: the first request after about 15 minutes idle takes up to a minute while it wakes up). Every payment there is a real NEAR testnet transaction with test USDC.
 
 
+> Built for the NEAR Hackathon (1–14 Nov 2026). Tracks: **Real-World Money** (vendor invoice links paid through NEAR Intents), **Agent Economy** (agents that pay and get paid) and **AI Security & Defense** (the vault stops a tricked agent; it answers the call for "Swarm-for-Hire, with guardrails or governance AI review").
+
 ## Screenshots
 
 Captured on 2026-11-13 from the live site ([usebeeline.xyz](https://usebeeline.xyz)), which runs on NEAR testnet with test USDC. The signed-in app (Bee's chat, the invoice list, cash out) is not pictured because it needs an email sign-in code.
@@ -35,8 +37,6 @@ Captured on 2026-11-13 from the live site ([usebeeline.xyz](https://usebeeline.x
 | ![Permanent pay link](docs/screenshots/permanent-link.png) | ![Security test page](docs/screenshots/security-test.png) |
 
 ![Public attack log](docs/screenshots/attack-log.png)
-
-> Built for the NEAR Hackathon (1–14 Nov 2026). Tracks: **Real-World Money** (vendor invoice links paid through NEAR Intents), **Agent Economy** (agents that pay and get paid) and **AI Security & Defense** (the vault stops a tricked agent; it answers the call for "Swarm-for-Hire, with guardrails or governance AI review").
 
 ## How it fits together
 
