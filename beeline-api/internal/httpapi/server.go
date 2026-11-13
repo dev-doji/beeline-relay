@@ -97,6 +97,7 @@ func NewRouter(d Deps) http.Handler {
 	h := &handlers{d: d}
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", healthHandler(d.DB))
+		r.Get("/health/ai", h.healthAI)
 		r.Get("/capabilities", h.capabilities)
 		r.Get("/networks", h.networks)
 		r.Get("/assets", h.assets)
