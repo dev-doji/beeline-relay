@@ -133,8 +133,10 @@ func Run(ctx context.Context, c Completer, model string, history []Message, user
 		}
 		st, err := parseStep(out)
 		if err != nil {
-			// A model that ignores the format still gets to answer, as plain text.
-			if s := strings.TrimSpace(out); s != "" && i == 0 {
+			// A model that ignores the format still gets to answer, as plain text. This holds after a tool call too:
+			// falling back to the command parser then would throw away what the tools already did (and could make a
+			// second invoice).
+			if s := strings.TrimSpace(out); s != "" {
 				res.Reply = clip(s, 1200)
 				return res, nil
 			}

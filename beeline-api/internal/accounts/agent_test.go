@@ -316,3 +316,16 @@ func TestBeeConvertsNairaOnlyWhenTheUserSaidNaira(t *testing.T) {
 		t.Fatal("no rate means no invoice")
 	}
 }
+
+func TestPlainTextAnswerAfterAToolCallIsKeptNotDiscarded(t *testing.T) {
+	h := &fakeHost{shop: "Ada", acct: "ada.testnet", rate: "1000"}
+	// The model uses a tool, then answers in plain prose instead of JSON. The user must get that answer, and the
+	// invoice the tool made must not be thrown away or repeated by a fallback.
+	res, _ := run(t, []string{
+		`{"tool":"create_invoice","args":{"items":[{"name":"inks","quantity":5,"price":"100"}],"currency":"NGN"}}`,
+		`Done! I made your invoice for 5 inks.`,
+	}, h, "make me an invoice for 5 inks at 100 naira each", "")
+	if res.Reply != "Done! I made your invoice for 5 inks." || res.Invoice == nil || len(h.created) != 1 {
+		t.Fatalf("reply=%q invoice=%v created=%d", res.Reply, res.Invoice, len(h.created))
+	}
+}
