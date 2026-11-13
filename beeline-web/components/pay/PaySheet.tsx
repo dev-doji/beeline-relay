@@ -44,6 +44,7 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
   const running = useRef(false);
 
   const real = invoice.network === "mainnet";
+  const demoOk = /^\d+$/.test(invoice.amount) && BigInt(invoice.amount) <= BigInt(5_000_000); // the shared test vault's per-payment limit
   const token = tokenContract(invoice.asset);
   const memo = invoiceMemo(invoice.id);
   const working = phase.kind === "working";
@@ -165,7 +166,12 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
         </div>
       )}
 
-      {!real && (
+      {!real && !demoOk && (
+        <section className="px-sheet-sec">
+          <p>The shared test vault pays at most 5 test USDC, so the Demo payment is off for this invoice. Pay it from a NEAR testnet wallet above.</p>
+        </section>
+      )}
+      {!real && demoOk && (
         <section className="px-sheet-sec demo">
           <button className="px-btn sm" onClick={onDemo} disabled={working || demoBusy}>
             {demoBusy ? "Paying…" : "Demo payment"}

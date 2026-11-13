@@ -23,8 +23,13 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/ids"
 )
 
-// MaxAmount caps playground invoices at the testnet vault's per-payment limit (5 test USDC).
-const MaxAmount = 5_000_000
+// VaultLimit is the testnet vault's per-payment limit (5 test USDC). The shared-vault Demo payment can pay no more
+// than this; a payment from a customer's own wallet does not go through the vault.
+const VaultLimit = 5_000_000
+
+// MaxAmount caps a test invoice at 1000 test USDC (test tokens have no value). Real-money invoices have their own,
+// much lower cap (see DefaultMainnetMax).
+const MaxAmount = 1_000_000_000
 
 // MainnetUSDC is Circle's native USDC on NEAR mainnet: the one asset a real-money invoice is paid in.
 const MainnetUSDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"
@@ -132,7 +137,7 @@ func (s *Service) IssuerPublicKeyHex() string {
 
 // Validate checks a test invoice and returns the total in base units. Real-money invoices go through Service.Check.
 func Validate(in *CreateInput) (string, error) {
-	return validate(in, MaxAmount, "playground invoices are capped at 5 test USDC (the testnet vault's per-payment limit)")
+	return validate(in, MaxAmount, "test invoices are capped at 1000 test USDC")
 }
 
 func validate(in *CreateInput, max int64, capMsg string) (string, error) {

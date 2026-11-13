@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -196,6 +197,12 @@ func (h *handlers) payInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	if amt, perr := strconv.ParseInt(inv.Amount, 10, 64); perr != nil || amt > invoices.VaultLimit {
+		// The shared test vault cannot pay this much. Say so up front instead of making it a vault refusal in the
+		// public attack log. A payment from the customer's own wallet is not affected.
+		writeAppError(w, r, h.d.Logger, apperr.Validation("The shared test vault pays at most 5 test USDC per payment, so the Demo payment is not available for this invoice. Pay it from a NEAR testnet wallet instead."))
 		return
 	}
 	if !h.allowRun(w, r) {

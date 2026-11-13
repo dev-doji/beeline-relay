@@ -289,3 +289,25 @@ func errMsg(out map[string]any) string {
 	}
 	return ""
 }
+
+func TestDemoPaymentRefusesInvoicesAboveTheSharedVaultLimit(t *testing.T) {
+	e := newClaimEnv(t)
+	big, err := e.svc.Create(context.Background(), invoices.CreateInput{
+		VendorName: "MS Clothing", Payout: "ms-clothing.testnet",
+		Items: []invoices.Item{{Name: "Five packs", Quantity: 5, UnitPrice: "100000000"}}, // 500 test USDC: allowed as an invoice
+	})
+	if err != nil {
+		t.Fatalf("a 500 test USDC invoice must be allowed: %v", err)
+	}
+	resp, err := http.Post(e.srv.URL+"/api/v1/playground/invoices/"+big.ID+"/pay", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnprocessableEntity && resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("the demo payment must be refused up front, got %d", resp.StatusCode)
+	}
+	if e.get(big.ID)["status"] != "open" {
+		t.Fatal("the invoice must stay open")
+	}
+}

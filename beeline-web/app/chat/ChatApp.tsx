@@ -468,7 +468,7 @@ export function ChatApp({
               <Send size={16} aria-hidden />
             </button>
           </form>
-          <p className="cx-foot">Test USDC on NEAR testnet, invoices up to 5 USDC. Bee can make mistakes, but it cannot send or move money.</p>
+          <p className="cx-foot">Test USDC on NEAR testnet, test invoices up to 1,000 USDC. Bee can make mistakes, but it cannot send or move money.</p>
         </div>
       </section>
     </div>

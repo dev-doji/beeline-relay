@@ -27,7 +27,7 @@ func TestValidateRejectsBadInput(t *testing.T) {
 		"no items": func(in *CreateInput) { in.Items = nil },
 		"price":    func(in *CreateInput) { in.Items[0].UnitPrice = "1.5" },
 		"qty":      func(in *CreateInput) { in.Items[0].Quantity = 0 },
-		"cap":      func(in *CreateInput) { in.Items[0].UnitPrice = "5000000" },
+		"cap":      func(in *CreateInput) { in.Items[0].UnitPrice = "1000000001" },
 	}
 	for name, mutate := range cases {
 		in := valid()
@@ -37,9 +37,9 @@ func TestValidateRejectsBadInput(t *testing.T) {
 		}
 	}
 	in := valid()
-	in.Items[0].UnitPrice = "5000000"
+	in.Items[0].UnitPrice = "1000000001"
 	_, err := Validate(&in)
-	if err == nil || !strings.Contains(err.Error(), "5 test USDC") {
+	if err == nil || !strings.Contains(err.Error(), "1000 test USDC") {
 		t.Fatalf("cap message: %v", err)
 	}
 }
