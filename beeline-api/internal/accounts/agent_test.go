@@ -46,7 +46,7 @@ func (h *fakeHost) SetProfile(_ context.Context, shop, acct string) error {
 	h.shop, h.acct = shop, acct
 	return nil
 }
-func (h *fakeHost) CreateInvoice(_ context.Context, items []invoices.Item, _ bool) (*invoices.Invoice, error) {
+func (h *fakeHost) CreateInvoice(_ context.Context, items []invoices.Item) (*invoices.Invoice, error) {
 	h.created = append(h.created, items)
 	return &invoices.Invoice{ID: "inv_test", Amount: "2500000", Payout: h.acct, Status: "open"}, nil
 }
@@ -242,22 +242,19 @@ func TestLiveNearAI(t *testing.T) {
 	}
 }
 
-func TestModelCannotChooseRealMoneyOnItsOwn(t *testing.T) {
-	h := &fakeHost{shop: "Ada Design", acct: "ada.near"}
-	res, _ := run(t, []string{
-		`{"tool":"create_invoice","args":{"items":[{"name":"logo","quantity":1,"price":"2"}],"real":true}}`,
-		`{"say":"I made a test invoice instead."}`,
-	}, h, "invoice 2 for logo", "")
-	if len(h.created) != 0 || res.Invoice != nil {
-		t.Fatal("a real-money invoice must not be made unless the user's own message asked for one")
-	}
-	h2 := &fakeHost{shop: "Ada Design", acct: "ada.near"}
-	res2, _ := run(t, []string{
-		`{"tool":"create_invoice","args":{"items":[{"name":"logo","quantity":1,"price":"2"}],"real":true}}`,
-		`{"say":"Done."}`,
-	}, h2, "make a real invoice for 2 USDC for logo", "")
-	if len(h2.created) != 1 || res2.Invoice == nil {
-		t.Fatal("when the user asks for a real invoice it is made")
+func TestEveryInvoiceFromBeeIsRealMoneyWhateverTheModelSays(t *testing.T) {
+	// There is no test mode and no "real" switch: a model that sends real:false or real:true, or nothing, gets the
+	// same result, because the host (the HTTP layer) always makes a real-money invoice.
+	for _, args := range []string{
+		`{"items":[{"name":"logo","quantity":1,"price":"1"}]}`,
+		`{"items":[{"name":"logo","quantity":1,"price":"1"}],"real":false}`,
+		`{"items":[{"name":"logo","quantity":1,"price":"1"}],"real":true}`,
+	} {
+		h := &fakeHost{shop: "Ada Design", acct: "ada.near"}
+		res, _ := run(t, []string{`{"tool":"create_invoice","args":` + args + `}`, `{"say":"Done."}`}, h, "invoice 1 for logo", "")
+		if len(h.created) != 1 || res.Invoice == nil {
+			t.Fatalf("args %s: invoice not made", args)
+		}
 	}
 }
 

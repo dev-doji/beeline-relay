@@ -51,7 +51,7 @@ func newMeEnv(t *testing.T) *meEnv {
 		DB:       pool,
 		Accounts: &accounts.Store{DB: pool, Now: time.Now},
 		Privy:    v,
-		Invoices: &invoices.Service{DB: pool, Issuer: issuer, Asset: "nep141:usdc.fakes.testnet", TTL: time.Hour, Now: time.Now},
+		Invoices: &invoices.Service{DB: pool, Issuer: issuer, Asset: "nep141:usdc.fakes.testnet", TTL: time.Hour, Now: time.Now, MainnetEnabled: true},
 	})
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
@@ -124,14 +124,14 @@ func TestSignedInUserMakesInvoicesInChatAndOnlySeesTheirOwn(t *testing.T) {
 	if code, _ := e.call(http.MethodPut, "/api/v1/me", alice, map[string]string{"shop_name": "Ada", "near_account": "NOT VALID!"}); code == 200 {
 		t.Fatal("an invalid payout account must be rejected")
 	}
-	if code, _ := e.call(http.MethodPut, "/api/v1/me", alice, map[string]string{"shop_name": "Ada Design", "near_account": "ada-design.testnet"}); code != 200 {
+	if code, _ := e.call(http.MethodPut, "/api/v1/me", alice, map[string]string{"shop_name": "Ada Design", "near_account": "ada-design.near"}); code != 200 {
 		t.Fatalf("profile: %d", code)
 	}
 
 	// An invoice request makes a real signed invoice for Alice's shop and payout.
-	code, out = e.call(http.MethodPost, "/api/v1/me/chat", alice, map[string]string{"message": "invoice 2.5 for logo design"})
+	code, out = e.call(http.MethodPost, "/api/v1/me/chat", alice, map[string]string{"message": "invoice 1.2 for logo design"})
 	inv, _ := out["invoice"].(map[string]any)
-	if code != 200 || inv == nil || inv["amount"] != "2500000" || inv["payout"] != "ada-design.testnet" || inv["vendor_name"] != "Ada Design" || inv["signature"] == "" {
+	if code != 200 || inv == nil || inv["amount"] != "1200000" || inv["payout"] != "ada-design.near" || inv["vendor_name"] != "Ada Design" || inv["signature"] == "" {
 		t.Fatalf("invoice: %d %v", code, out)
 	}
 	// Text that is not an invoice request makes none.

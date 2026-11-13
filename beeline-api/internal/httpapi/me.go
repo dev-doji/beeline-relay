@@ -143,12 +143,14 @@ func (c *chatHost) SetProfile(ctx context.Context, shop, account string) error {
 	return nil
 }
 
-func (c *chatHost) CreateInvoice(ctx context.Context, items []invoices.Item, real bool) (*invoices.Invoice, error) {
-	ci := invoices.CreateInput{VendorName: c.user.ShopName, Payout: c.user.NearAccount, Items: items, Real: real}
+// CreateInvoice makes a real-money invoice (USDC on NEAR mainnet) for the signed-in vendor. There is no test mode here:
+// the public attack-demo pages are the only place test invoices exist.
+func (c *chatHost) CreateInvoice(ctx context.Context, items []invoices.Item) (*invoices.Invoice, error) {
+	ci := invoices.CreateInput{VendorName: c.user.ShopName, Payout: c.user.NearAccount, Items: items, Real: true}
 	if _, err := c.h.d.Invoices.Check(&ci); err != nil {
 		return nil, err // a request problem (for example a cap): the agent explains it
 	}
-	if real && c.h.d.Storage != nil {
+	if c.h.d.Storage != nil {
 		// Money delivered to an account that is not registered with the USDC contract can fail to arrive. Check first.
 		token := strings.TrimPrefix(invoices.MainnetUSDC, "nep141:")
 		if ok, err := c.h.d.Storage.StorageRegistered(ctx, token, strings.ToLower(c.user.NearAccount)); err == nil && !ok {
@@ -298,7 +300,7 @@ func (h *handlers) parserTurn(ctx context.Context, host *chatHost, msg string) *
 	if err != nil {
 		return &accounts.Result{Reply: err.Error()}
 	}
-	inv, err := host.CreateInvoice(ctx, items, false)
+	inv, err := host.CreateInvoice(ctx, items)
 	if err != nil {
 		return &accounts.Result{Reply: "I could not make that invoice: " + err.Error()}
 	}

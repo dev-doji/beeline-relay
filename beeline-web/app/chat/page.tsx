@@ -92,7 +92,7 @@ export default function ChatPage() {
             <div className="auth-fine rise" style={{ animationDelay: "260ms" }}>
               <span className="tag">one-time code by email</span>
               <span className="tag">NEAR wallet created for you</span>
-              <span className="tag">test USDC on testnet</span>
+              <span className="tag">real USDC on NEAR</span>
             </div>
           </div>
 

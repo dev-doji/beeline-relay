@@ -23,7 +23,7 @@ import (
 //   - set_profile only takes a shop name and account the user literally typed in their latest
 //     message (or "wallet", meaning the wallet created for them), so a model cannot redirect payouts;
 //   - prices are exact decimal strings converted to integer base units, never floats, and the
-//     test-invoice cap (1000 test USDC) and the real-money cap still apply.
+//     real-money cap (1.5 USDC in early access) still applies.
 
 // Completer runs one chat completion (satisfied by *nearai.Client).
 type Completer interface {
@@ -34,7 +34,7 @@ type Completer interface {
 type Host interface {
 	Profile() (shop, account string)
 	SetProfile(ctx context.Context, shop, account string) error
-	CreateInvoice(ctx context.Context, items []invoices.Item, real bool) (*invoices.Invoice, error)
+	CreateInvoice(ctx context.Context, items []invoices.Item) (*invoices.Invoice, error)
 	ListInvoices(ctx context.Context) ([]invoices.Invoice, error)
 	PermanentLinkPath() (string, error)
 	// NGNRate is naira per 1 USDC (decimal string) from Switch's payout quote, used to convert naira prices.
@@ -63,7 +63,7 @@ What you can do for the signed-in user (and nothing else):
 
 Rules:
 - Prices are in USDC unless the user says naira (NGN). If a price has no currency and looks like naira (over 1000), ask "Is that in naira or USDC?" before making the invoice. Never convert currencies yourself: pass the naira price with "currency":"NGN" and the app converts at Switch's rate and tells you the result.
-- By default invoices are in test USDC on NEAR testnet, at most 1000 USDC each (the Demo payment from the shared test vault works only up to 5 USDC; customers can pay any amount from their own testnet wallet). Only when the user's own message asks for a real or live invoice (real money, real USDC) set "real": true: that is USDC on NEAR mainnet, capped in early access, payable from any wallet or exchange. Never set real on your own. Prices must be exact numbers the user gave you; never invent a price or guess.
+- Every invoice is REAL money: USDC on NEAR mainnet, at most 1.5 USDC each while Beeline is in early access. Customers pay by scanning a QR code with any wallet or exchange (Binance, Bybit, Tokkenly, MetaMask and more, on many chains) or from a NEAR wallet. There is no test or demo invoice here: if asked, say invoices are real money. Prices must be exact numbers the user gave you; never invent a price or guess.
 - You cannot send, pay, refund or move money. Never say a payment was made unless list_invoices shows status "paid".
 - If you need shop name or payout account, ask for it. If the user says to use their wallet, call set_profile with near_account "wallet".
 - You are not a financial advisor. If asked something unrelated, say briefly what you can help with.
@@ -74,7 +74,7 @@ To answer the user: {"say":"<your message>"}
 
 Tools:
 - set_profile {"shop_name":"...","near_account":"... or wallet"}   (only values the user typed in their last message)
-- create_invoice {"items":[{"name":"...","quantity":1,"price":"25.00"}],"currency":"USDC","real":false}   (price is per unit, as a decimal string, in USDC by default; use "currency":"NGN" only when the user's own message says the prices are in naira, and the app converts to USDC; real only if the user asked for a real-money invoice)
+- create_invoice {"items":[{"name":"...","quantity":1,"price":"1.00"}],"currency":"USDC"}   (price is per unit, as a decimal string, in USDC by default; use "currency":"NGN" only when the user's own message says the prices are in naira, and the app converts to USDC)
 - permanent_link {}
 - list_invoices {}
 
@@ -205,7 +205,6 @@ func runTool(ctx context.Context, host Host, st *step, userMsg, wallet string, r
 				Quantity int             `json:"quantity"`
 				Price    json.RawMessage `json:"price"`
 			} `json:"items"`
-			Real     bool   `json:"real"`
 			Currency string `json:"currency"`
 		}
 		if json.Unmarshal(st.Args, &a) != nil || len(a.Items) == 0 || len(a.Items) > 10 {
@@ -264,10 +263,7 @@ func runTool(ctx context.Context, host Host, st *step, userMsg, wallet string, r
 			}
 			items = append(items, invoices.Item{Name: clip(name, 80), Quantity: q, UnitPrice: units})
 		}
-		if a.Real && !wantsReal(userMsg) {
-			return "error: only create a real-money invoice when the user's message asks for one; otherwise make a test invoice"
-		}
-		inv, err := host.CreateInvoice(ctx, items, a.Real)
+		inv, err := host.CreateInvoice(ctx, items)
 		if err != nil {
 			if cur == "NGN" {
 				return fmt.Sprintf("error: %s. For reference the converted total is about %s USDC at %s naira per USDC", err.Error(), usdcString(totalUnits.String()), rate)

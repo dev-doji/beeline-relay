@@ -4,7 +4,7 @@
 
 - **Pay from anywhere is built, not yet run with real funds.** Real-money invoices (native USDC on NEAR mainnet, capped, `MAINNET_INVOICES=on`) can be paid from any wallet or exchange through a one-time NEAR Intents deposit address (`internal/payin`, `internal/httpapi/payin.go`, migration `0007_payin_quotes`, `components/pay/PayAnywhere.tsx`). "Paid" needs NEAR Intents `SUCCESS` **and** the vendor's on-chain USDC balance to have risen by the invoice amount (`intents-delivered`). See `docs/PAYMENT_FLOW.md` Path C and the README row. Off by default; to try it set the env vars in `docs/DEPLOY.md` and make one small invoice, **only with the owner's explicit yes** before real money moves.
 - **Testnet wallet payments** (phase 1) have also never seen a real signed payment; testing that needs the owner's say-so (scripted from `beeline-api/.testnet`, or their own wallet).
-- Bee only makes a real-money invoice when the user's own message contains "real", "live" or "mainnet"; the model cannot choose it. The public invoice form never makes real invoices.
+- Every invoice Bee makes for a signed-in vendor is real money (USDC on NEAR mainnet, capped at 1.5 USDC in early access); test invoices exist only on the public security-test and demo pages. The public invoice form never makes real invoices.
 
 ## Earlier notes (7 Nov 2026)
 
