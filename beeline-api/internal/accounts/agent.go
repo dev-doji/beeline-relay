@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -36,6 +37,8 @@ type Host interface {
 	CreateInvoice(ctx context.Context, items []invoices.Item, real bool) (*invoices.Invoice, error)
 	ListInvoices(ctx context.Context) ([]invoices.Invoice, error)
 	PermanentLinkPath() (string, error)
+	// NGNRate is naira per 1 USDC (decimal string) from Switch's payout quote, used to convert naira prices.
+	NGNRate(ctx context.Context) (string, error)
 }
 
 // Result is what one turn produced.
@@ -59,6 +62,7 @@ What you can do for the signed-in user (and nothing else):
 - point them to "Cash out to bank" in the sidebar to turn USDC into naira (you cannot do that step yourself)
 
 Rules:
+- Prices are in USDC unless the user says naira (NGN). If a price has no currency and looks like naira (over 1000), ask "Is that in naira or USDC?" before making the invoice. Never convert currencies yourself: pass the naira price with "currency":"NGN" and the app converts at Switch's rate and tells you the result.
 - By default invoices are in test USDC on NEAR testnet, at most 5 USDC each. Only when the user's own message asks for a real or live invoice (real money, real USDC) set "real": true: that is USDC on NEAR mainnet, capped in early access, payable from any wallet or exchange. Never set real on your own. Prices must be exact numbers the user gave you; never invent a price or guess.
 - You cannot send, pay, refund or move money. Never say a payment was made unless list_invoices shows status "paid".
 - If you need shop name or payout account, ask for it. If the user says to use their wallet, call set_profile with near_account "wallet".
@@ -70,7 +74,7 @@ To answer the user: {"say":"<your message>"}
 
 Tools:
 - set_profile {"shop_name":"...","near_account":"... or wallet"}   (only values the user typed in their last message)
-- create_invoice {"items":[{"name":"...","quantity":1,"price":"25.00"}],"real":false}   (price is USDC per unit, as a decimal string; real only if the user asked for a real-money invoice)
+- create_invoice {"items":[{"name":"...","quantity":1,"price":"25.00"}],"currency":"USDC","real":false}   (price is per unit, as a decimal string, in USDC by default; use "currency":"NGN" only when the user's own message says the prices are in naira, and the app converts to USDC; real only if the user asked for a real-money invoice)
 - permanent_link {}
 - list_invoices {}
 
@@ -199,14 +203,51 @@ func runTool(ctx context.Context, host Host, st *step, userMsg, wallet string, r
 				Quantity int             `json:"quantity"`
 				Price    json.RawMessage `json:"price"`
 			} `json:"items"`
-			Real bool `json:"real"`
+			Real     bool   `json:"real"`
+			Currency string `json:"currency"`
 		}
 		if json.Unmarshal(st.Args, &a) != nil || len(a.Items) == 0 || len(a.Items) > 10 {
 			return "error: items must be a list of 1 to 10 items"
 		}
+		cur := strings.ToUpper(strings.TrimSpace(a.Currency))
+		if cur == "" {
+			cur = "USDC"
+		}
+		rate := ""
+		if cur == "NGN" {
+			if !wantsNaira(userMsg) {
+				return "error: only price in naira when the user's message says naira; otherwise ask whether the price is in naira or USDC"
+			}
+			var rerr error
+			if rate, rerr = host.NGNRate(ctx); rerr != nil {
+				return "error: today's naira rate is not available right now; ask the user to price in USDC or try again shortly"
+			}
+		} else if cur != "USDC" {
+			return "error: currency must be USDC or NGN"
+		}
 		var items []invoices.Item
+		totalUnits := new(big.Int)
 		for _, it := range a.Items {
 			price := strings.Trim(strings.TrimSpace(string(it.Price)), `"`)
+			if cur == "NGN" {
+				units, err := ngnToUnits(price, rate)
+				if err != nil {
+					return fmt.Sprintf("error: %q is not a valid naira price; use a positive amount like 600000", price)
+				}
+				q := it.Quantity
+				if q == 0 {
+					q = 1
+				}
+				name := strings.TrimSpace(it.Name)
+				if name == "" {
+					name = "Payment"
+				}
+				name = clip(name, 50) + " (₦" + niceNaira(price) + " each)"
+				u, _ := new(big.Int).SetString(units, 10)
+				totalUnits.Add(totalUnits, new(big.Int).Mul(u, big.NewInt(int64(q))))
+				items = append(items, invoices.Item{Name: name, Quantity: q, UnitPrice: units})
+				continue
+			}
 			units, ok := usdcUnits(price)
 			if !ok || !regexp.MustCompile(`^\d+(\.\d{1,6})?$`).MatchString(price) {
 				return fmt.Sprintf("error: %q is not a valid price; use a positive decimal like 25 or 0.15", price)
@@ -226,9 +267,15 @@ func runTool(ctx context.Context, host Host, st *step, userMsg, wallet string, r
 		}
 		inv, err := host.CreateInvoice(ctx, items, a.Real)
 		if err != nil {
+			if cur == "NGN" {
+				return fmt.Sprintf("error: %s. For reference the converted total is about %s USDC at %s naira per USDC", err.Error(), usdcString(totalUnits.String()), rate)
+			}
 			return "error: " + err.Error()
 		}
 		res.Invoice = inv
+		if cur == "NGN" {
+			return "created invoice " + inv.ID + " for " + usdcString(inv.Amount) + " USDC (converted from naira at " + rate + " naira per USDC, Switch's rate now; the invoice is fixed in USDC) payable to " + inv.Payout + " (status " + inv.Status + ")"
+		}
 		return "created invoice " + inv.ID + " for " + usdcString(inv.Amount) + " USDC payable to " + inv.Payout + " (status " + inv.Status + ")"
 
 	case "permanent_link":

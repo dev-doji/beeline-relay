@@ -37,6 +37,7 @@ type fakeHost struct {
 	setCalls   int
 	created    [][]invoices.Item
 	list       []invoices.Invoice
+	rate       string // naira per USDC for the fake
 }
 
 func (h *fakeHost) Profile() (string, string) { return h.shop, h.acct }
@@ -48,6 +49,12 @@ func (h *fakeHost) SetProfile(_ context.Context, shop, acct string) error {
 func (h *fakeHost) CreateInvoice(_ context.Context, items []invoices.Item, _ bool) (*invoices.Invoice, error) {
 	h.created = append(h.created, items)
 	return &invoices.Invoice{ID: "inv_test", Amount: "2500000", Payout: h.acct, Status: "open"}, nil
+}
+func (h *fakeHost) NGNRate(context.Context) (string, error) {
+	if h.rate == "" {
+		return "", errors.New("no rate")
+	}
+	return h.rate, nil
 }
 func (h *fakeHost) ListInvoices(context.Context) ([]invoices.Invoice, error) { return h.list, nil }
 func (h *fakeHost) PermanentLinkPath() (string, error) {
@@ -251,5 +258,61 @@ func TestModelCannotChooseRealMoneyOnItsOwn(t *testing.T) {
 	}, h2, "make a real invoice for 2 USDC for logo", "")
 	if len(h2.created) != 1 || res2.Invoice == nil {
 		t.Fatal("when the user asks for a real invoice it is made")
+	}
+}
+
+func TestNairaPricesConvertAtTheRateAndRoundUp(t *testing.T) {
+	cases := []struct{ ngn, rate, want string }{
+		{"5000", "1000", "5000000"},
+		{"10", "3", "3333334"},              // 3.333333.. rounds up so the vendor is never short
+		{"600000", "1407.764", "426207802"}, // ceil(600000 * 1e6 / 1407.764), computed independently
+	}
+	for _, c := range cases {
+		got, err := ngnToUnits(c.ngn, c.rate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != c.want {
+			t.Errorf("%s NGN at %s = %s, want %s", c.ngn, c.rate, got, c.want)
+		}
+	}
+	for _, bad := range [][2]string{{"0", "1000"}, {"-5", "1000"}, {"1e3", "1000"}, {"100", "0"}, {"100", "abc"}, {"0.001", "1000000"}} {
+		if _, err := ngnToUnits(bad[0], bad[1]); err == nil {
+			t.Errorf("%v must be refused", bad)
+		}
+	}
+}
+
+func TestBeeConvertsNairaOnlyWhenTheUserSaidNaira(t *testing.T) {
+	h := &fakeHost{shop: "Ada", acct: "ada.testnet", rate: "1000"}
+	// The model asks for naira, but the user never said naira: refused, nothing created.
+	res, _ := run(t, []string{
+		`{"tool":"create_invoice","args":{"items":[{"name":"computers","quantity":5,"price":"3000"}],"currency":"NGN"}}`,
+		`{"say":"Is that in naira or USDC?"}`,
+	}, h, "invoice for 5 computers at 3000", "")
+	if len(h.created) != 0 || res.Invoice != nil {
+		t.Fatal("naira conversion must not happen unless the user's own message says naira")
+	}
+	// The user says naira: converted, in exact base units, with the naira price kept on the line.
+	h2 := &fakeHost{shop: "Ada", acct: "ada.testnet", rate: "1000"}
+	res2, _ := run(t, []string{
+		`{"tool":"create_invoice","args":{"items":[{"name":"computers","quantity":5,"price":"3000"}],"currency":"NGN"}}`,
+		`{"say":"Done."}`,
+	}, h2, "invoice for 5 computers at 3000 naira each", "")
+	if len(h2.created) != 1 || res2.Invoice == nil {
+		t.Fatal("a naira invoice should be created when the user says naira")
+	}
+	it := h2.created[0][0]
+	if it.UnitPrice != "3000000" || it.Quantity != 5 || !strings.Contains(it.Name, "₦3,000") {
+		t.Fatalf("unexpected line: %+v", it)
+	}
+	// No rate available: refused, nothing created.
+	h3 := &fakeHost{shop: "Ada", acct: "ada.testnet"}
+	run(t, []string{
+		`{"tool":"create_invoice","args":{"items":[{"name":"x","quantity":1,"price":"3000"}],"currency":"NGN"}}`,
+		`{"say":"Rate unavailable."}`,
+	}, h3, "invoice 3000 naira for x", "")
+	if len(h3.created) != 0 {
+		t.Fatal("no rate means no invoice")
 	}
 }

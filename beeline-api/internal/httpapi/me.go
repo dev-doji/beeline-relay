@@ -2,16 +2,19 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/accounts"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/apperr"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/switchramp"
 )
 
 // Signed-in app: a user signs in with Privy (email code), sets a shop name and payout account, then
@@ -136,6 +139,37 @@ func (c *chatHost) CreateInvoice(ctx context.Context, items []invoices.Item, rea
 		return nil, err // a request problem (for example the 5 USDC cap): the agent explains it
 	}
 	return c.h.d.Invoices.CreateFor(ctx, c.uid, ci)
+}
+
+// The naira rate is Switch's payout quote for 100 USDC to a Nigerian bank (naira per USDC). It is read-only,
+// and cached for a minute so a burst of invoices does not hit Switch each time.
+var nairaRate struct {
+	mu   sync.Mutex
+	rate string
+	at   time.Time
+}
+
+func (c *chatHost) NGNRate(ctx context.Context) (string, error) {
+	if c.h.d.Switch == nil {
+		return "", errors.New("naira conversion is not configured")
+	}
+	nairaRate.mu.Lock()
+	defer nairaRate.mu.Unlock()
+	if nairaRate.rate != "" && time.Since(nairaRate.at) < time.Minute {
+		return nairaRate.rate, nil
+	}
+	raw, err := c.h.d.Switch.OfframpQuote(ctx, switchramp.QuoteInput{Amount: "100", Country: "NG", Asset: "base:usdc"})
+	if err != nil {
+		return "", err
+	}
+	var q struct {
+		Rate json.Number `json:"rate"`
+	}
+	if json.Unmarshal(raw, &q) != nil || q.Rate.String() == "" {
+		return "", errors.New("switch returned no rate")
+	}
+	nairaRate.rate, nairaRate.at = q.Rate.String(), time.Now()
+	return nairaRate.rate, nil
 }
 
 func (c *chatHost) ListInvoices(ctx context.Context) ([]invoices.Invoice, error) {
