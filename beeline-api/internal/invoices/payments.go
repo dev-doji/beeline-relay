@@ -11,15 +11,17 @@ import (
 
 // Payment is a payment that was read from the chain and matched the invoice.
 type Payment struct {
-	TxHash       string    `json:"tx_hash"`
-	Sender       string    `json:"sender"`
-	Receiver     string    `json:"receiver"`
-	Token        string    `json:"token"`
-	Amount       string    `json:"amount"`
-	Memo         string    `json:"memo"`
-	BlockHash    string    `json:"block_hash"`
-	BlockTime    time.Time `json:"block_time"`
-	Verification string    `json:"verification"` // always "chain-verified"
+	TxHash    string    `json:"tx_hash"`
+	Sender    string    `json:"sender"`
+	Receiver  string    `json:"receiver"`
+	Token     string    `json:"token"`
+	Amount    string    `json:"amount"`
+	Memo      string    `json:"memo"`
+	BlockHash string    `json:"block_hash"`
+	BlockTime time.Time `json:"block_time"`
+	// Verification says how it was checked: "chain-verified" (a direct NEAR transfer read from the chain) or
+	// "intents-delivered" (NEAR Intents reported delivery and the vendor's own USDC balance rose by the amount).
+	Verification string    `json:"verification"`
 	VerifiedAt   time.Time `json:"verified_at"`
 }
 
@@ -54,8 +56,11 @@ func (s *Service) RecordPayment(ctx context.Context, invoiceID string, p Payment
 	if ct.RowsAffected() != 1 {
 		return nil, ErrAlreadyPaid
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO invoice_payments (tx_hash, invoice_id, sender, receiver, token, amount, memo, block_hash, block_time, verified_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, p.TxHash, invoiceID, p.Sender, p.Receiver, p.Token, p.Amount, p.Memo, p.BlockHash, p.BlockTime, now)
+	if p.Verification == "" {
+		p.Verification = "chain-verified"
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO invoice_payments (tx_hash, invoice_id, sender, receiver, token, amount, memo, block_hash, block_time, verification, verified_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, p.TxHash, invoiceID, p.Sender, p.Receiver, p.Token, p.Amount, p.Memo, p.BlockHash, p.BlockTime, p.Verification, now)
 	if err != nil {
 		var pg *pgconn.PgError
 		if errors.As(err, &pg) && pg.Code == "23505" { // unique violation: this hash or this invoice already has a payment
@@ -66,7 +71,7 @@ func (s *Service) RecordPayment(ctx context.Context, invoiceID string, p Payment
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
-	p.Verification, p.VerifiedAt = "chain-verified", now
+	p.VerifiedAt = now
 	return &p, nil
 }
 

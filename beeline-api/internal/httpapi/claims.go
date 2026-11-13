@@ -108,9 +108,17 @@ func (h *handlers) claimInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	verifier := h.d.Claims
+	if invoices.NetworkOf(inv.Asset) == "mainnet" {
+		verifier = h.d.ClaimsMainnet
+		if verifier == nil {
+			writeAppError(w, r, h.d.Logger, apperr.New(http.StatusServiceUnavailable, apperr.CodeProviderUnavailable, "Paying real-money invoices from a NEAR wallet is not enabled on this server."))
+			return
+		}
+	}
 	vctx, cancel := context.WithTimeout(ctx, claimTimeout)
 	defer cancel()
-	res := h.d.Claims.Verify(vctx, chainverify.Params{
+	res := verifier.Verify(vctx, chainverify.Params{
 		TxHash: in.TxHash, Sender: in.Sender, Token: strings.TrimPrefix(inv.Asset, nep141Prefix),
 		Receiver: inv.Payout, Amount: inv.Amount, Memo: invoiceMemo(inv.ID), ExpiresAt: inv.ExpiresAt,
 	})

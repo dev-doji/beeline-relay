@@ -6,7 +6,7 @@ import { ArrowLeft, ExternalLink, ShieldCheck } from "lucide-react";
 import { Receipt } from "@/components/invoice/Receipt";
 import { ShareLink } from "@/components/invoice/ShareLink";
 import { AttemptList } from "@/components/attacks/AttemptList";
-import { type Attempt, type Invoice, type InvoiceEvent, TX_URL, formatUSDC, getInvoiceAttempts, getInvoiceEvents, shortKey } from "@/lib/api";
+import { type Attempt, type Invoice, type InvoiceEvent, MAINNET_TX_URL, TX_URL, formatUSDC, getInvoiceAttempts, getInvoiceEvents, shortKey } from "@/lib/api";
 
 // Plain labels for the reasons Beeline refuses a payment claim.
 const EVENT_TITLE: Record<string, string> = {
@@ -22,6 +22,9 @@ const EVENT_TITLE: Record<string, string> = {
   EXPIRED: "Paid after the invoice expired",
   ALREADY_PAID: "Second payment refused",
   TX_REUSED: "Transaction already used",
+  PAYIN_REFUNDED: "Cross-chain payment refunded",
+  PAYIN_FAILED: "Cross-chain payment failed",
+  PAYIN_INCOMPLETE: "Cross-chain payment too small",
 };
 
 /**
@@ -71,6 +74,7 @@ export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: (
               status: invoice.status,
               expires_at: invoice.expires_at,
               signed: true,
+              network: invoice.network,
             }}
           />
           <Link className="cx-link" href={`/pay/${invoice.id}`} target="_blank">
@@ -81,11 +85,24 @@ export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: (
               <b className="cx-sec">Payment</b>
               <span className={invoice.status === "paid" ? "cx-tag ok" : "cx-tag"}>{invoice.status === "paid" ? "Paid" : "Waiting"}</span>
             </div>
-            {invoice.payment ? (
+            {invoice.payment?.verification === "intents-delivered" ? (
+              <p className="cx-small">
+                <b>Delivered by NEAR Intents, confirmed by Beeline.</b> A customer paid from {invoice.payment.sender.replace("cross-chain:", "another chain (")}
+                {invoice.payment.sender.startsWith("cross-chain:") ? ")" : ""}. NEAR Intents reported delivery and your USDC balance on NEAR rose by {formatUSDC(invoice.payment.amount)} USDC.
+                {!invoice.payment.tx_hash.startsWith("intents:") && (
+                  <>
+                    {" "}
+                    <a className="cx-link" href={MAINNET_TX_URL + invoice.payment.tx_hash} target="_blank" rel="noreferrer">
+                      Delivery {shortKey(invoice.payment.tx_hash, 5)}
+                    </a>
+                  </>
+                )}
+              </p>
+            ) : invoice.payment ? (
               <p className="cx-small">
                 <b>Verified on-chain.</b> Beeline read this payment from NEAR: {formatUSDC(invoice.payment.amount)} USDC from {invoice.payment.sender}, in a final block on{" "}
                 {new Date(invoice.payment.block_time).toLocaleString()}.{" "}
-                <a className="cx-link" href={TX_URL + invoice.payment.tx_hash} target="_blank" rel="noreferrer">
+                <a className="cx-link" href={(invoice.network === "mainnet" ? MAINNET_TX_URL : TX_URL) + invoice.payment.tx_hash} target="_blank" rel="noreferrer">
                   Transaction {shortKey(invoice.payment.tx_hash, 5)}
                 </a>
               </p>

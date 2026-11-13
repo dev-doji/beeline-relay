@@ -2,11 +2,11 @@
 
 import { useRef, useState } from "react";
 import { Check, Copy, Loader2 } from "lucide-react";
+import { PayAnywhere } from "./PayAnywhere";
 import { ApiError, type Invoice, claimPayment, formatUSDC, invoiceMemo, tokenContract } from "@/lib/api";
 
 type Phase = { kind: "idle" } | { kind: "working"; text: string } | { kind: "problem"; text: string };
 
-const NEAR_NETWORK = "testnet" as const; // invoices are on NEAR testnet until the verifier has had an outside review
 const GAS = "30000000000000"; // 30 Tgas, plenty for one ft_transfer
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -43,6 +43,7 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
   const [hash, setHash] = useState("");
   const running = useRef(false);
 
+  const real = invoice.network === "mainnet";
   const token = tokenContract(invoice.asset);
   const memo = invoiceMemo(invoice.id);
   const working = phase.kind === "working";
@@ -77,7 +78,7 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
       setPhase({ kind: "working", text: "Opening your wallet…" });
       // Loaded only now: the wallet package needs a browser.
       const { NearConnector } = await import("@hot-labs/near-connect");
-      const connector = new NearConnector({ network: NEAR_NETWORK });
+      const connector = new NearConnector({ network: real ? "mainnet" : "testnet" });
       const wallet = await connector.connect();
       const account = (await wallet.getAccounts())[0]?.accountId;
       if (!account) throw new Error("no account");
@@ -118,15 +119,21 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
   const manualOk = hash.trim().length >= 43 && sender.trim().length >= 2;
   return (
     <div className="px-sheet">
+      {real && (
+        <section className="px-sheet-sec">
+          <PayAnywhere invoice={invoice} onPaid={onPaid} />
+        </section>
+      )}
+
       <section className="px-sheet-sec">
-        <b>Pay from your NEAR wallet</b>
+        <b>{real ? "Or pay from your NEAR wallet" : "Pay from your NEAR wallet"}</b>
         <button className="px-btn dark full" onClick={() => void payWithWallet()} disabled={working || demoBusy}>
           {working ? <Loader2 size={15} className="px-spin" aria-hidden /> : null} Connect wallet and pay {formatUSDC(invoice.amount)} USDC
         </button>
       </section>
 
       <section className="px-sheet-sec">
-        <b>Or send from any wallet or exchange</b>
+        <b>{real ? "Or send USDC on NEAR yourself" : "Or send from any wallet or exchange"}</b>
         <p>Send exactly this, with this memo. Without the memo we cannot match the payment to this invoice.</p>
         <CopyRow label="Send to" value={invoice.payout} />
         <CopyRow label="Amount" value={formatUSDC(invoice.amount)} show={`${formatUSDC(invoice.amount)} USDC`} />
@@ -158,12 +165,14 @@ export function PaySheet({ invoice, onPaid, onDemo, demoBusy }: { invoice: Invoi
         </div>
       )}
 
-      <section className="px-sheet-sec demo">
-        <button className="px-btn sm" onClick={onDemo} disabled={working || demoBusy}>
-          {demoBusy ? "Paying…" : "Demo payment"}
-        </button>
-        <span>No wallet? A test agent pays from Beeline’s shared test vault. Testnet only.</span>
-      </section>
+      {!real && (
+        <section className="px-sheet-sec demo">
+          <button className="px-btn sm" onClick={onDemo} disabled={working || demoBusy}>
+            {demoBusy ? "Paying…" : "Demo payment"}
+          </button>
+          <span>No wallet? A test agent pays from Beeline’s shared test vault. Testnet only.</span>
+        </section>
+      )}
     </div>
   );
 }

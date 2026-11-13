@@ -45,7 +45,7 @@ func (h *fakeHost) SetProfile(_ context.Context, shop, acct string) error {
 	h.shop, h.acct = shop, acct
 	return nil
 }
-func (h *fakeHost) CreateInvoice(_ context.Context, items []invoices.Item) (*invoices.Invoice, error) {
+func (h *fakeHost) CreateInvoice(_ context.Context, items []invoices.Item, _ bool) (*invoices.Invoice, error) {
 	h.created = append(h.created, items)
 	return &invoices.Invoice{ID: "inv_test", Amount: "2500000", Payout: h.acct, Status: "open"}, nil
 }
@@ -232,5 +232,24 @@ func TestLiveNearAI(t *testing.T) {
 	t.Logf("invoice: %s", res.Reply)
 	if len(h.created) != 1 || h.created[0][0].UnitPrice != "2500000" {
 		t.Fatalf("the real model should have made one invoice at 2.5 USDC: %+v", h.created)
+	}
+}
+
+func TestModelCannotChooseRealMoneyOnItsOwn(t *testing.T) {
+	h := &fakeHost{shop: "Ada Design", acct: "ada.near"}
+	res, _ := run(t, []string{
+		`{"tool":"create_invoice","args":{"items":[{"name":"logo","quantity":1,"price":"2"}],"real":true}}`,
+		`{"say":"I made a test invoice instead."}`,
+	}, h, "invoice 2 for logo", "")
+	if len(h.created) != 0 || res.Invoice != nil {
+		t.Fatal("a real-money invoice must not be made unless the user's own message asked for one")
+	}
+	h2 := &fakeHost{shop: "Ada Design", acct: "ada.near"}
+	res2, _ := run(t, []string{
+		`{"tool":"create_invoice","args":{"items":[{"name":"logo","quantity":1,"price":"2"}],"real":true}}`,
+		`{"say":"Done."}`,
+	}, h2, "make a real invoice for 2 USDC for logo", "")
+	if len(h2.created) != 1 || res2.Invoice == nil {
+		t.Fatal("when the user asks for a real invoice it is made")
 	}
 }

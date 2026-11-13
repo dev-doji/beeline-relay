@@ -12,6 +12,7 @@ export interface ReceiptData {
   status?: "open" | "paid" | "draft";
   expires_at?: string;
   signed?: boolean;
+  network?: "mainnet" | "testnet";
 }
 
 function initials(name: string) {
@@ -73,7 +74,7 @@ export function Receipt({ data }: { data: ReceiptData }) {
         </b>
       </div>
       <div className="payto">
-        <span>Pays out to (NEAR testnet)</span>
+        <span>Pays out to (NEAR {data.network === "mainnet" ? "mainnet" : "testnet"})</span>
         <code>{data.payout ? shortKey(data.payout, 12) : "—"}</code>
       </div>
       {data.signed && (

@@ -141,7 +141,8 @@ func (h *handlers) createInvoice(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, r, h.d.Logger, err)
 		return
 	}
-	if _, err := invoices.Validate(&in); err != nil {
+	in.Real = false // real-money invoices are made only by signed-in vendors (through Bee), never by the public form
+	if _, err := h.d.Invoices.Check(&in); err != nil {
 		writeAppError(w, r, h.d.Logger, apperr.Validation(err.Error()))
 		return
 	}

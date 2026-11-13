@@ -63,3 +63,13 @@ With a `live` key the price preview works, but **real cash-outs stay off** until
 - **Updates:** pushing to `main` redeploys both services automatically.
 - **Secrets:** they live only in the Render dashboard and on your PC (`beeline-api/.env`, `beeline-api/.testnet/`). The agent and invoice keys are testnet-only keys.
 - **Rate limits:** the public playground allows 4 runs per minute per visitor and 300 per day (`PLAYGROUND_RUNS_PER_*`), because each run uses NEAR AI credits and testnet gas.
+
+## Real-money invoices and pay-from-anywhere (off by default)
+
+Set on Render only when you are ready to take a small real payment:
+
+- `MAINNET_INVOICES=on`: lets signed-in vendors make real-money invoices (native USDC on NEAR mainnet) through Bee, and turns on pay-from-any-chain through NEAR Intents. Needs `NEAR_INTENTS_API_KEY`.
+- `MAINNET_INVOICE_MAX_UNITS` (optional): cap per invoice in USDC base units; default `25000000` (25 USDC).
+- `NEAR_MAINNET_RPC_URLS` (optional): comma-separated mainnet RPC URLs used to verify wallet payments and read the vendor's USDC balance; default `https://archival-rpc.mainnet.fastnear.com,https://archival-rpc.mainnet.near.org`.
+
+Apply migration `0007_payin_quotes` first (the API runs migrations on start). Switch `MAINNET_INVOICES` off again after a test. The first real payment needs the owner's explicit go-ahead: see `docs/REAL_MONEY_TEST.md`.

@@ -26,6 +26,20 @@ import (
 // MaxAmount caps playground invoices at the testnet vault's per-payment limit (5 test USDC).
 const MaxAmount = 5_000_000
 
+// MainnetUSDC is Circle's native USDC on NEAR mainnet: the one asset a real-money invoice is paid in.
+const MainnetUSDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"
+
+// DefaultMainnetMax caps a real-money invoice (base units, 6 decimals) while Beeline is in early access: 25 USDC.
+const DefaultMainnetMax = 25_000_000
+
+// NetworkOf says which NEAR network an invoice's asset lives on.
+func NetworkOf(asset string) string {
+	if asset == MainnetUSDC {
+		return "mainnet"
+	}
+	return "testnet"
+}
+
 var (
 	ErrNotFound = errors.New("invoice not found")
 	// NEAR account IDs: named (ada.testnet, shop.ada.testnet) or implicit (64 hex).
@@ -46,6 +60,8 @@ type CreateInput struct {
 	Payout       string `json:"payout"`
 	Memo         string `json:"memo"`
 	Items        []Item `json:"items"`
+	// Real asks for a real-money invoice (USDC on NEAR mainnet) instead of a test one.
+	Real bool `json:"real"`
 }
 
 // Payload is the signed invoice body. Field order is fixed: the signature covers these bytes.
@@ -71,7 +87,8 @@ type Invoice struct {
 	Items        []Item     `json:"items"`
 	Payload      string     `json:"payload"`
 	Signature    string     `json:"signature"`
-	Status       string     `json:"status"` // open | paid
+	Network      string     `json:"network"` // testnet | mainnet, from the asset
+	Status       string     `json:"status"`  // open | paid
 	PaidTx       *string    `json:"paid_tx"`
 	PaidAt       *time.Time `json:"paid_at"`
 	// Payment is set only when the server read the payment from the chain and it matched the invoice.
@@ -86,15 +103,39 @@ type Service struct {
 	Asset  string // destination asset the vault pays out in
 	TTL    time.Duration
 	Now    func() time.Time
+	// MainnetEnabled lets vendors create real-money invoices (USDC on NEAR mainnet); MainnetMax caps them.
+	MainnetEnabled bool
+	MainnetMax     int64
 }
+
+// Check validates an invoice request for this service and returns the total in base units.
+func (s *Service) Check(in *CreateInput) (string, error) {
+	if in.Real {
+		if !s.MainnetEnabled {
+			return "", errors.New("real-money invoices are not switched on yet")
+		}
+		max := s.MainnetMax
+		if max <= 0 {
+			max = DefaultMainnetMax
+		}
+		return validate(in, max, fmt.Sprintf("real invoices are capped at %s USDC while Beeline is in early access", formatMax(max)))
+	}
+	return Validate(in)
+}
+
+func formatMax(units int64) string { return fmt.Sprintf("%d", units/1_000_000) }
 
 // IssuerPublicKeyHex is the key the vault owner registers with set_invoice_issuer.
 func (s *Service) IssuerPublicKeyHex() string {
 	return hex.EncodeToString(s.Issuer.Public().(ed25519.PublicKey))
 }
 
-// Validate checks the input and returns the total in base units.
+// Validate checks a test invoice and returns the total in base units. Real-money invoices go through Service.Check.
 func Validate(in *CreateInput) (string, error) {
+	return validate(in, MaxAmount, "playground invoices are capped at 5 test USDC (the testnet vault's per-payment limit)")
+}
+
+func validate(in *CreateInput, max int64, capMsg string) (string, error) {
 	in.VendorName = strings.TrimSpace(in.VendorName)
 	in.VendorHandle = strings.TrimSpace(in.VendorHandle)
 	in.Memo = strings.TrimSpace(in.Memo)
@@ -128,8 +169,8 @@ func Validate(in *CreateInput) (string, error) {
 		p, _ := new(big.Int).SetString(it.UnitPrice, 10)
 		total.Add(total, p.Mul(p, big.NewInt(int64(it.Quantity))))
 	}
-	if total.Cmp(big.NewInt(MaxAmount)) > 0 {
-		return "", errors.New("playground invoices are capped at 5 test USDC (the testnet vault's per-payment limit)")
+	if total.Cmp(big.NewInt(max)) > 0 {
+		return "", errors.New(capMsg)
 	}
 	return total.String(), nil
 }
@@ -141,14 +182,18 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*Invoice, error) 
 
 // CreateFor is Create for a signed-in user: the invoice is recorded as theirs. userID "" means anonymous.
 func (s *Service) CreateFor(ctx context.Context, userID string, in CreateInput) (*Invoice, error) {
-	amount, err := Validate(&in)
+	amount, err := s.Check(&in)
 	if err != nil {
 		return nil, err
+	}
+	asset := s.Asset
+	if in.Real {
+		asset = MainnetUSDC
 	}
 	now := s.Now().UTC()
 	expires := now.Add(s.TTL).Truncate(time.Second)
 	p := Payload{V: 1, ID: ids.New(ids.Invoice), Vendor: in.VendorName, Payout: in.Payout,
-		Asset: s.Asset, Amount: amount, ExpiresAt: expires.Unix(), Memo: in.Memo}
+		Asset: asset, Amount: amount, ExpiresAt: expires.Unix(), Memo: in.Memo}
 	payload, err := json.Marshal(p)
 	if err != nil {
 		return nil, err
@@ -182,7 +227,10 @@ func (s *Service) Get(ctx context.Context, id string) (*Invoice, error) {
 		return nil, err
 	}
 	_ = json.Unmarshal(items, &inv.Items)
-	inv.Payment, _ = s.PaymentFor(ctx, id)
+	inv.Network = NetworkOf(inv.Asset)
+	if inv.Payment, err = s.PaymentFor(ctx, id); err != nil {
+		return nil, err // never show a paid invoice without its payment because of a database hiccup
+	}
 	return &inv, nil
 }
 

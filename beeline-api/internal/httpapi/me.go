@@ -130,9 +130,9 @@ func (c *chatHost) SetProfile(ctx context.Context, shop, account string) error {
 	return nil
 }
 
-func (c *chatHost) CreateInvoice(ctx context.Context, items []invoices.Item) (*invoices.Invoice, error) {
-	ci := invoices.CreateInput{VendorName: c.user.ShopName, Payout: c.user.NearAccount, Items: items}
-	if _, err := invoices.Validate(&ci); err != nil {
+func (c *chatHost) CreateInvoice(ctx context.Context, items []invoices.Item, real bool) (*invoices.Invoice, error) {
+	ci := invoices.CreateInput{VendorName: c.user.ShopName, Payout: c.user.NearAccount, Items: items, Real: real}
+	if _, err := c.h.d.Invoices.Check(&ci); err != nil {
 		return nil, err // a request problem (for example the 5 USDC cap): the agent explains it
 	}
 	return c.h.d.Invoices.CreateFor(ctx, c.uid, ci)
@@ -227,7 +227,7 @@ func (h *handlers) parserTurn(ctx context.Context, host *chatHost, msg string) *
 	if err != nil {
 		return &accounts.Result{Reply: err.Error()}
 	}
-	inv, err := host.CreateInvoice(ctx, items)
+	inv, err := host.CreateInvoice(ctx, items, false)
 	if err != nil {
 		return &accounts.Result{Reply: "I could not make that invoice: " + err.Error()}
 	}

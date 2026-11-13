@@ -27,6 +27,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/near"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/nearai"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/payin"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/playground"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
@@ -113,6 +114,21 @@ func run() error {
 
 	cat := catalog.Default()
 	provider := intents.NewClient(cfg.IntentsBaseURL, cfg.IntentsAPIKey, 15*time.Second)
+
+	// Real-money invoices (USDC on NEAR mainnet) are off unless MAINNET_INVOICES=on. They are capped, and
+	// pay-in from other chains (NEAR Intents) exists only for them.
+	var claimsMainnet httpapi.ClaimVerifier
+	var payIn *payin.Service
+	if inv != nil && os.Getenv("MAINNET_INVOICES") == "on" {
+		rpc := chainverify.NewHTTPRPC(urlList("NEAR_MAINNET_RPC_URLS", "https://archival-rpc.mainnet.fastnear.com,https://archival-rpc.mainnet.near.org"), 25*time.Second)
+		claimsMainnet = &chainverify.Verifier{RPC: rpc}
+		inv.MainnetEnabled = true
+		if v, err := strconv.ParseInt(os.Getenv("MAINNET_INVOICE_MAX_UNITS"), 10, 64); err == nil && v > 0 {
+			inv.MainnetMax = v
+		}
+		payIn = &payin.Service{DB: pool, Intents: provider, Tokens: provider, Balance: &chainverify.BalanceReader{RPC: rpc}, Invoices: inv, Now: time.Now}
+		log.Info("real-money invoices enabled (mainnet)", "cap_units", inv.MainnetMax)
+	}
 	router := httpapi.NewRouter(httpapi.Deps{
 		Logger:             log,
 		DB:                 pool,
@@ -130,6 +146,8 @@ func run() error {
 		Accounts:           acct,
 		Chat:               chatCompleter(chatAI),
 		Claims:             claimVerifier(),
+		ClaimsMainnet:      claimsMainnet,
+		PayIn:              payIn,
 		ChatModel:          envOr("NEAR_AI_AGENT_MODEL", "z-ai/glm-5.3-flash"),
 		Privy:              privy,
 		CashoutLive:        os.Getenv("CASHOUT_LIVE") == "on",
@@ -201,14 +219,21 @@ func chatCompleter(c *nearai.Client) accounts.Completer {
 // claimVerifier reads wallet payments from NEAR. Archival-capable endpoints come first because a normal
 // node cannot look up older transactions (checked 2026-11-13). Override with NEAR_VERIFY_RPC_URLS.
 func claimVerifier() *chainverify.Verifier {
-	urls := []string{"https://archival-rpc.testnet.fastnear.com", "https://archival-rpc.testnet.near.org"}
-	if v := strings.TrimSpace(os.Getenv("NEAR_VERIFY_RPC_URLS")); v != "" {
-		urls = nil
-		for _, u := range strings.Split(v, ",") {
-			if u = strings.TrimSpace(u); u != "" {
-				urls = append(urls, u)
-			}
+	urls := urlList("NEAR_VERIFY_RPC_URLS", "https://archival-rpc.testnet.fastnear.com,https://archival-rpc.testnet.near.org")
+	return &chainverify.Verifier{RPC: chainverify.NewHTTPRPC(urls, 25*time.Second)}
+}
+
+// urlList reads a comma-separated list of URLs from an environment variable, or uses the default.
+func urlList(env, def string) []string {
+	v := strings.TrimSpace(os.Getenv(env))
+	if v == "" {
+		v = def
+	}
+	var urls []string
+	for _, u := range strings.Split(v, ",") {
+		if u = strings.TrimSpace(u); u != "" {
+			urls = append(urls, u)
 		}
 	}
-	return &chainverify.Verifier{RPC: chainverify.NewHTTPRPC(urls, 25*time.Second)}
+	return urls
 }

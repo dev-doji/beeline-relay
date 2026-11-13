@@ -178,6 +178,8 @@ export interface Invoice {
   payload: string;
   signature: string;
   status: "open" | "paid";
+  /** "mainnet" invoices are real USDC; "testnet" ones are test tokens. */
+  network?: "mainnet" | "testnet";
   paid_tx: string | null;
   paid_at: string | null;
   /** Set only when the server read the payment from the chain and it matched the invoice. */
@@ -195,7 +197,8 @@ export interface Payment {
   memo: string;
   block_hash: string;
   block_time: string;
-  verification: "chain-verified";
+  /** "chain-verified": a NEAR transfer read from the chain. "intents-delivered": NEAR Intents reported delivery and the vendor's balance rose. */
+  verification: "chain-verified" | "intents-delivered";
   verified_at: string;
 }
 
@@ -392,3 +395,49 @@ export const claimPayment = (invoiceId: string, txHash: string, senderAccountId:
 
 export const getInvoiceEvents = (invoiceId: string) =>
   request<{ data: InvoiceEvent[] }>(`/api/v1/playground/invoices/${encodeURIComponent(invoiceId)}/events`);
+
+// ---- Paying from any chain or exchange (NEAR Intents deposit address; real-money invoices only) ----
+
+export const MAINNET_TX_URL = "https://nearblocks.io/txns/";
+
+export interface PayinOption {
+  asset_id: string;
+  chain: string;
+  chain_name: string;
+  symbol: string;
+  decimals: number;
+}
+
+export type PayinStatus = "waiting" | "processing" | "confirming" | "paid" | "incomplete" | "refunded" | "failed" | "expired";
+
+export interface PayinQuote {
+  id: number;
+  invoice_id: string;
+  origin_asset: string;
+  chain: string;
+  chain_name: string;
+  symbol: string;
+  amount_in: string; // what to send, whole units, e.g. "2.004"
+  deposit_address: string;
+  deposit_memo: string;
+  refund_to: string;
+  deadline: string;
+  status: PayinStatus;
+  provider_status: string; // NEAR Intents' own word (provider-reported)
+  delivered_tx: string;
+  message: string;
+}
+
+export const getPayinOptions = () => request<{ data: PayinOption[] }>("/api/v1/payin/options");
+
+export const createPayin = (invoiceId: string, originAsset: string, refundTo: string) =>
+  request<{ quote: PayinQuote }>(`/api/v1/playground/invoices/${encodeURIComponent(invoiceId)}/payin`, {
+    method: "POST",
+    body: JSON.stringify({ origin_asset: originAsset, refund_to: refundTo }),
+  });
+
+/** Reads the pay-in's progress. The server asks NEAR Intents and the chain; the page never decides "paid". */
+export const getPayin = (invoiceId: string) =>
+  request<{ quote: PayinQuote | null; invoice_status: "open" | "paid"; payment: Payment | null }>(
+    `/api/v1/playground/invoices/${encodeURIComponent(invoiceId)}/payin`,
+  );

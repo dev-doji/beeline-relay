@@ -19,6 +19,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/payin"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/payment"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/playground"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/quote"
@@ -70,6 +71,10 @@ type Deps struct {
 	ChatModel string
 	// Claims verifies wallet payments against the chain; nil disables POST /playground/invoices/{id}/claims.
 	Claims ClaimVerifier
+	// ClaimsMainnet verifies wallet payments for real-money (mainnet) invoices; nil refuses them.
+	ClaimsMainnet ClaimVerifier
+	// PayIn lets customers pay a real-money invoice from any chain through NEAR Intents; nil disables it.
+	PayIn *payin.Service
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -103,6 +108,9 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/playground/invoices/{id}/attempts", h.invoiceAttempts)
 		r.Post("/playground/invoices/{id}/claims", h.claimInvoice)
 		r.Get("/playground/invoices/{id}/events", h.invoiceEvents)
+		r.Get("/payin/options", h.payinOptions)
+		r.Post("/playground/invoices/{id}/payin", h.payinCreate)
+		r.Get("/playground/invoices/{id}/payin", h.payinStatus)
 		r.Get("/playground/attempts", h.attackLog)
 		r.Post("/cashout/quote", h.cashoutQuote)
 		r.Post("/cashout/start", h.cashoutStart)

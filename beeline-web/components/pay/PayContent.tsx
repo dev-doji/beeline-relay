@@ -4,7 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Check, ShieldCheck } from "lucide-react";
 import { Receipt } from "@/components/invoice/Receipt";
-import { TX_URL, formatUSDC, shortKey } from "@/lib/api";
+import { MAINNET_TX_URL, TX_URL, formatUSDC, shortKey } from "@/lib/api";
 import { PaySheet } from "./PaySheet";
 import { usePay } from "./usePay";
 
@@ -43,6 +43,11 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
   }
 
   const paid = invoice.status === "paid";
+  const real = invoice.network === "mainnet";
+  const viaIntents = invoice.payment?.verification === "intents-delivered";
+  const txBase = real ? MAINNET_TX_URL : TX_URL;
+  // A payment from another chain has no NEAR transaction hash of its own that we can vouch for; show it only when it is a real one.
+  const canLink = !!invoice.paid_tx && !invoice.paid_tx.startsWith("intents:");
   const r = current?.result;
   // A payment that Beeline refused or that did not finish is explained in plain words.
   const problem = current?.error
@@ -55,7 +60,7 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <div className="px-wrap narrow">
-      <span className="px-chip">Invoice · NEAR testnet</span>
+      <span className="px-chip">{real ? "Invoice · real USDC on NEAR" : "Invoice · NEAR testnet"}</span>
 
       <Receipt
         data={{
@@ -69,18 +74,27 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
           status: invoice.status,
           expires_at: invoice.expires_at,
           signed: true,
+          network: invoice.network,
         }}
       />
 
       {paid && invoice.paid_tx ? (
         <>
-          <a className="px-btn ok lg full" href={TX_URL + invoice.paid_tx} target="_blank" rel="noreferrer">
-            <Check size={16} aria-hidden /> Paid · view the transaction {shortKey(invoice.paid_tx, 5)} <ArrowUpRight size={14} aria-hidden />
-          </a>
+          {canLink ? (
+            <a className="px-btn ok lg full" href={txBase + invoice.paid_tx} target="_blank" rel="noreferrer">
+              <Check size={16} aria-hidden /> Paid · view the transaction {shortKey(invoice.paid_tx, 5)} <ArrowUpRight size={14} aria-hidden />
+            </a>
+          ) : (
+            <div className="px-btn ok lg full">
+              <Check size={16} aria-hidden /> Paid
+            </div>
+          )}
           <p className="px-note">
-            {invoice.payment
-              ? "Verified on NEAR: Beeline read this payment from the chain and it matched the invoice."
-              : "Demo payment: a test agent paid from Beeline’s shared test vault."}
+            {viaIntents
+              ? "Delivered by NEAR Intents and confirmed by Beeline: the vendor's USDC balance on NEAR rose by this amount."
+              : invoice.payment
+                ? "Verified on NEAR: Beeline read this payment from the chain and it matched the invoice."
+                : "Demo payment: a test agent paid from Beeline’s shared test vault."}
           </p>
         </>
       ) : (
@@ -88,7 +102,7 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
           <button className="px-btn dark lg full" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
             Pay {formatUSDC(invoice.amount)} USDC
           </button>
-          <p className="px-note">Test payment on NEAR testnet. No real money moves.</p>
+          <p className="px-note">{real ? "Real money: this invoice is paid in USDC on NEAR." : "Test payment on NEAR testnet. No real money moves."}</p>
           {open && <PaySheet invoice={invoice} onPaid={() => void reload()} onDemo={() => void send({})} demoBusy={busy} />}
         </>
       )}

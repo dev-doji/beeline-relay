@@ -33,7 +33,7 @@ type Completer interface {
 type Host interface {
 	Profile() (shop, account string)
 	SetProfile(ctx context.Context, shop, account string) error
-	CreateInvoice(ctx context.Context, items []invoices.Item) (*invoices.Invoice, error)
+	CreateInvoice(ctx context.Context, items []invoices.Item, real bool) (*invoices.Invoice, error)
 	ListInvoices(ctx context.Context) ([]invoices.Invoice, error)
 	PermanentLinkPath() (string, error)
 }
@@ -59,7 +59,7 @@ What you can do for the signed-in user (and nothing else):
 - point them to "Cash out to bank" in the sidebar to turn USDC into naira (you cannot do that step yourself)
 
 Rules:
-- Amounts are in test USDC on NEAR testnet, at most 5 USDC per invoice. Prices must be exact numbers the user gave you; never invent a price or guess.
+- By default invoices are in test USDC on NEAR testnet, at most 5 USDC each. Only when the user's own message asks for a real or live invoice (real money, real USDC) set "real": true: that is USDC on NEAR mainnet, capped in early access, payable from any wallet or exchange. Never set real on your own. Prices must be exact numbers the user gave you; never invent a price or guess.
 - You cannot send, pay, refund or move money. Never say a payment was made unless list_invoices shows status "paid".
 - If you need shop name or payout account, ask for it. If the user says to use their wallet, call set_profile with near_account "wallet".
 - You are not a financial advisor. If asked something unrelated, say briefly what you can help with.
@@ -70,7 +70,7 @@ To answer the user: {"say":"<your message>"}
 
 Tools:
 - set_profile {"shop_name":"...","near_account":"... or wallet"}   (only values the user typed in their last message)
-- create_invoice {"items":[{"name":"...","quantity":1,"price":"25.00"}]}   (price is USDC per unit, as a decimal string)
+- create_invoice {"items":[{"name":"...","quantity":1,"price":"25.00"}],"real":false}   (price is USDC per unit, as a decimal string; real only if the user asked for a real-money invoice)
 - permanent_link {}
 - list_invoices {}
 
@@ -199,6 +199,7 @@ func runTool(ctx context.Context, host Host, st *step, userMsg, wallet string, r
 				Quantity int             `json:"quantity"`
 				Price    json.RawMessage `json:"price"`
 			} `json:"items"`
+			Real bool `json:"real"`
 		}
 		if json.Unmarshal(st.Args, &a) != nil || len(a.Items) == 0 || len(a.Items) > 10 {
 			return "error: items must be a list of 1 to 10 items"
@@ -220,7 +221,10 @@ func runTool(ctx context.Context, host Host, st *step, userMsg, wallet string, r
 			}
 			items = append(items, invoices.Item{Name: clip(name, 80), Quantity: q, UnitPrice: units})
 		}
-		inv, err := host.CreateInvoice(ctx, items)
+		if a.Real && !wantsReal(userMsg) {
+			return "error: only create a real-money invoice when the user's message asks for one; otherwise make a test invoice"
+		}
+		inv, err := host.CreateInvoice(ctx, items, a.Real)
 		if err != nil {
 			return "error: " + err.Error()
 		}
@@ -255,6 +259,11 @@ func runTool(ctx context.Context, host Host, st *step, userMsg, wallet string, r
 	}
 	return "error: unknown tool"
 }
+
+var realWordRe = regexp.MustCompile(`\b(real|live|mainnet)\b`)
+
+// wantsReal is true only when the user's own message asks for a real-money invoice. The model cannot decide that.
+func wantsReal(userMsg string) bool { return realWordRe.MatchString(strings.ToLower(userMsg)) }
 
 // usdcString renders base units as a USDC decimal ("2500000" -> "2.5").
 func usdcString(u string) string {

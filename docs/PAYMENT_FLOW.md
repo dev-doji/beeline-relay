@@ -154,3 +154,12 @@ step. **Unknown, must be measured first:** the cost of deploying a vault per use
 - Web: the pay sheet (two options), the confirming and paid states, vendor evidence and events. The security-test page and
   the demo payment stay as labelled demo tools.
 - Tests: every row of the threat table gets a test against a recorded RPC response; plus idempotency, expiry and replay.
+
+## Path C: pay from any chain or exchange (built, real-money invoices, unverified with real funds)
+
+A real-money invoice (USDC on NEAR mainnet) can also be paid from a wallet or exchange on another chain. Beeline asks NEAR Intents for a one-time deposit address that delivers the invoice's exact USDC amount to the vendor, bound to the invoice (exact output, vendor payout, amount, refund address, expiry). The customer sends to it from anywhere; Beeline holds no keys and signs nothing.
+
+"Paid" needs two independent signals: NEAR Intents reports `SUCCESS` (provider-reported) and the vendor's own USDC balance on NEAR, read from the chain, rose by at least the invoice amount since the quote. Neither alone is enough. The payment is recorded as `intents-delivered`, distinct from `chain-verified` (a direct NEAR transfer read from the chain). Refunds, failures and short deposits leave the invoice open and appear as security events. A terminal quote never changes state.
+
+Honest limits: no real funds have gone through it; NEAR Intents has no testnet; an unrelated USDC transfer to the vendor in the same window could satisfy the balance signal (the provider signal must still be `SUCCESS` for this invoice's address); the signer of NEAR delivery transactions is not known, so the delivery transaction itself is not independently matched; the vendor's account may need a USDC storage registration; the customer must send the right token on the right network.
+

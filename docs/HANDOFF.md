@@ -1,6 +1,12 @@
-# Handoff: current state (7 Nov 2026)
+# Handoff: current state (13 Nov 2026)
 
-## Latest (7 Nov 2026): read this first
+## Latest (13 Nov 2026): read this first
+
+- **Pay from anywhere is built, not yet run with real funds.** Real-money invoices (native USDC on NEAR mainnet, capped, `MAINNET_INVOICES=on`) can be paid from any wallet or exchange through a one-time NEAR Intents deposit address (`internal/payin`, `internal/httpapi/payin.go`, migration `0007_payin_quotes`, `components/pay/PayAnywhere.tsx`). "Paid" needs NEAR Intents `SUCCESS` **and** the vendor's on-chain USDC balance to have risen by the invoice amount (`intents-delivered`). See `docs/PAYMENT_FLOW.md` Path C and the README row. Off by default; to try it set the env vars in `docs/DEPLOY.md` and make one small invoice, **only with the owner's explicit yes** before real money moves.
+- **Testnet wallet payments** (phase 1) have also never seen a real signed payment; testing that needs the owner's say-so (scripted from `beeline-api/.testnet`, or their own wallet).
+- Bee only makes a real-money invoice when the user's own message contains "real", "live" or "mainnet"; the model cannot choose it. The public invoice form never makes real invoices.
+
+## Earlier notes (7 Nov 2026)
 
 - **Hosted:** website https://usebeeline.xyz (Vercel project devopsnormads-projects/beeline, root `beeline-web`); API https://beeline-api-z3tu.onrender.com (Render free plan, `render.yaml`, sleeps after ~15 min idle); database Neon. Secrets live only in the Render dashboard; `scripts/hosting-env.ps1` prints them locally. See `docs/DEPLOY.md`.
 - **Product direction (owner, 7 Nov):** no canned "simulate" buttons. The core demo is **dare-a-friend pay links**: a vendor creates a signed invoice (`/vendor`), sends the link to anyone, and visitors attack it on `/pay/[id]` with free text and/or an edited payee or amount. Bee (NEAR AI) decides, and the vault decides on-chain. Every attempt goes to the public attack log (`/attacks`, `GET /api/v1/playground/attempts`, migration 0004) with computed totals, including "paid to the wrong account".
