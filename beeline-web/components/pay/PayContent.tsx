@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Check, ShieldCheck } from "lucide-react";
 import { Receipt } from "@/components/invoice/Receipt";
@@ -16,7 +16,6 @@ import { usePay } from "./usePay";
 export function PayContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { invoice, loadError, current, reload } = usePay(id);
-  const [openState, setOpen] = useState<boolean | null>(null);
 
   if (loadError) {
     return (
@@ -44,8 +43,6 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
 
   const paid = invoice.status === "paid";
   const real = invoice.network === "mainnet";
-  // A real-money invoice shows how to pay straight away; a test invoice waits for the button.
-  const open = openState ?? real;
   const viaIntents = invoice.payment?.verification === "intents-delivered";
   const txBase = real ? MAINNET_TX_URL : TX_URL;
   // A payment from another chain has no NEAR transaction hash of its own that we can vouch for; show it only when it is a real one.
@@ -101,13 +98,8 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
         </>
       ) : (
         <>
-          {!real && (
-            <button className="px-btn dark lg full" onClick={() => setOpen(!open)} aria-expanded={open}>
-              Pay {formatUSDC(invoice.amount)} USDC
-            </button>
-          )}
           <p className="px-note">{real ? "Real money: this invoice is paid in USDC on NEAR." : "Test payment on NEAR testnet. No real money moves."}</p>
-          {open && <PaySheet invoice={invoice} onPaid={() => void reload()} />}
+          <PaySheet invoice={invoice} onPaid={() => void reload()} />
         </>
       )}
 
