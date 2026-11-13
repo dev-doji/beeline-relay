@@ -102,3 +102,5 @@
   .ck-field input, .ck-field select { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .ck-spin { animation-duration: 2.4s; } .ck-btn { transition: none; } }
+
+.ck-btn .ck-sub2 { font-size: 12px; font-weight: 400; opacity: 0.75; margin-left: 4px; }

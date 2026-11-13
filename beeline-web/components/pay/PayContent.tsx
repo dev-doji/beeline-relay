@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowUpRight, Check, Copy, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Check, Copy, QrCode, ShieldCheck } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { lineTotal } from "@/components/invoice/Receipt";
 import {
@@ -60,6 +60,7 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { invoice, loadError, reload } = usePay(id);
   const [quote, setQuote] = useState<PayinQuote | null>(null);
+  const [method, setMethod] = useState<"wallet" | "qr" | null>(null);
 
   if (loadError) {
     return (
@@ -150,10 +151,18 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
             View your receipt
           </Link>
         </div>
-      ) : real ? (
-        <RealPay invoice={invoice} quote={quote} setQuote={setQuote} onPaid={() => void reload()} />
+      ) : !method ? (
+        <ChoosePay real={real} onPick={setMethod} />
+      ) : method === "qr" ? (
+        <>
+          <RealPay invoice={invoice} quote={quote} setQuote={setQuote} onPaid={() => void reload()} />
+          <BackLink onClick={() => setMethod(null)} />
+        </>
       ) : (
-        <WalletPay invoice={invoice} onPaid={() => void reload()} />
+        <>
+          <WalletPay invoice={invoice} onPaid={() => void reload()} />
+          <BackLink onClick={() => setMethod(null)} />
+        </>
       )}
 
       <div className="ck-foot">
@@ -163,6 +172,42 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
         <Link href={`/pay/${invoice.id}/security-test`}>Security test</Link> · <Link href="/attacks">Attack log</Link>
       </div>
     </div>
+  );
+}
+
+/** Step one, as on Rhodium's checkout: how do you want to pay? A wallet only opens when the customer picks it. */
+function ChoosePay({ real, onPick }: { real: boolean; onPick: (m: "wallet" | "qr") => void }) {
+  return (
+    <>
+      <div className="ck-label">How do you want to pay?</div>
+      <button className="ck-btn" onClick={() => onPick("qr")} disabled={!real}>
+        <QrCode aria-hidden /> Scan a QR code
+        <span className="ck-sub2">any wallet or exchange</span>
+      </button>
+      <button className="ck-btn secondary" onClick={() => onPick("wallet")}>
+        Pay with a NEAR wallet
+      </button>
+      <div className="ck-hint">
+        {real ? (
+          <>
+            Scan with <b>Binance, Bybit, Tokkenly, MetaMask, Trust</b> or any wallet on Base, Ethereum, BNB Chain, Solana, Tron, TON and more. NEAR Intents delivers it to the seller
+            as USDC on NEAR. Either way the seller is paid and you get a receipt.
+          </>
+        ) : (
+          <>
+            Paying from other wallets and exchanges works on <b>real-money invoices</b>: NEAR Intents has no test network. This is a test invoice, so use a NEAR testnet wallet.
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function BackLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="ck-btn secondary" onClick={onClick} style={{ marginTop: 10 }}>
+      Change how I pay
+    </button>
   );
 }
 
@@ -268,7 +313,13 @@ function WalletPay({ invoice, onPaid }: { invoice: Invoice; onPaid: () => void }
         </div>
       )}
       <div className="ck-hint">
-        Your wallet will ask you to confirm. This is a test invoice on NEAR testnet: <b>no real money moves</b>.
+        {invoice.network === "mainnet" ? (
+          <>Your wallet will ask you to confirm. The money goes straight to the seller.</>
+        ) : (
+          <>
+            Your wallet will ask you to confirm. This is a test invoice on NEAR testnet: <b>no real money moves</b>.
+          </>
+        )}
       </div>
     </>
   );
@@ -286,7 +337,6 @@ function RealPay({ invoice, quote, setQuote, onPaid }: { invoice: Invoice; quote
   const [checking, setChecking] = useState(false);
   const [checkNote, setCheckNote] = useState<string | null>(null);
   const paidOnce = useRef(false);
-  const wallet = useWalletPay(invoice, onPaid);
   const live = !!quote && !TERMINAL.has(quote.status);
   const countdown = useCountdown(quote?.deadline, live);
 
@@ -494,16 +544,7 @@ function RealPay({ invoice, quote, setQuote, onPaid }: { invoice: Invoice; quote
           {problem}
         </div>
       )}
-      <button className="ck-btn secondary" onClick={() => void wallet.pay()} disabled={wallet.state.kind === "working"}>
-        Pay from a NEAR wallet instead
-      </button>
-      {wallet.state.kind === "working" && <Waiting>{wallet.state.text}</Waiting>}
-      {wallet.state.kind === "problem" && (
-        <div className="ck-err" role="alert">
-          {wallet.state.text}
-        </div>
-      )}
-      <div className="ck-hint">Pay from any wallet or exchange: Binance, Bybit, Tokkenly, MetaMask, Trust and more. Scan the QR code on the next step. Nothing to paste back.</div>
+      <div className="ck-hint">Scan the QR code on the next step with any wallet or exchange. Nothing to paste back.</div>
     </>
   );
 }
