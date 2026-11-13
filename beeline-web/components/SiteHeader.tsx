@@ -9,7 +9,7 @@ import { REPO_URL } from "@/lib/api";
 /** Pill navigation for the website. The app pages have their own sidebar, so they hide this. */
 export function SiteHeader() {
   const path = usePathname();
-  if (["/playground", "/monitor", "/vendor", "/pay", "/attacks", "/chat"].some((p) => path?.startsWith(p))) return null;
+  if (["/playground", "/monitor", "/vendor", "/pay", "/receipt", "/attacks", "/chat"].some((p) => path?.startsWith(p))) return null;
   return (
     <header className="lp-wrap pnav-shell">
       <div className="pnav">
