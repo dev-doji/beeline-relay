@@ -85,6 +85,9 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
   }
 
   const real = invoice.network === "mainnet";
+  // A real-money invoice goes straight to the QR code (it lands in the seller's NEAR Intents balance, from any network).
+  // A test invoice asks first, because only a NEAR testnet wallet can pay it.
+  const chosen = real ? "qr" : method;
   const paid = invoice.status === "paid";
   const live = quote && !TERMINAL.has(quote.status) ? quote : null;
   const viaIntents = invoice.payment?.verification === "intents-delivered";
@@ -151,12 +154,12 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
             View your receipt
           </Link>
         </div>
-      ) : !method ? (
+      ) : !chosen ? (
         <ChoosePay real={real} onPick={setMethod} />
-      ) : method === "qr" ? (
+      ) : chosen === "qr" ? (
         <>
           <RealPay invoice={invoice} quote={quote} setQuote={setQuote} onPaid={() => void reload()} />
-          <BackLink onClick={() => setMethod(null)} />
+          {!real && <BackLink onClick={() => setMethod(null)} />}
         </>
       ) : (
         <>

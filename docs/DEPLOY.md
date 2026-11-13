@@ -70,6 +70,6 @@ Set on Render only when you are ready to take a small real payment:
 
 - `MAINNET_INVOICES=on`: lets signed-in vendors make real-money invoices (native USDC on NEAR mainnet) through Bee, and turns on pay-from-any-chain through NEAR Intents. Needs `NEAR_INTENTS_API_KEY`.
 - `MAINNET_INVOICE_MAX_UNITS` (optional): cap per invoice in USDC base units; default `1500000` (1.5 USDC).
-- `NEAR_MAINNET_RPC_URLS` (optional): comma-separated mainnet RPC URLs used to verify wallet payments and read the vendor's USDC balance; default `https://archival-rpc.mainnet.fastnear.com,https://archival-rpc.mainnet.near.org`.
+- `NEAR_MAINNET_RPC_URLS` (optional): comma-separated mainnet RPC URLs used to verify wallet payments and read the vendor's Intents balance; default `https://archival-rpc.mainnet.fastnear.com,https://archival-rpc.mainnet.near.org`.
 
 Apply migration `0007_payin_quotes` first (the API runs migrations on start). Switch `MAINNET_INVOICES` off again after a test. The first real payment needs the owner's explicit go-ahead: see `docs/REAL_MONEY_TEST.md`.

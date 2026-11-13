@@ -86,7 +86,7 @@ type fakeBalance struct {
 	v  *big.Int
 }
 
-func (b *fakeBalance) FTBalance(context.Context, string, string) (*big.Int, error) {
+func (b *fakeBalance) IntentsBalance(context.Context, string, string) (*big.Int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return new(big.Int).Set(b.v), nil
@@ -107,7 +107,7 @@ var addrSeq int
 func newPayinEnv(t *testing.T) *payinEnv {
 	t.Helper()
 	_, issuer, _ := ed25519.GenerateKey(rand.Reader)
-	inv := &invoices.Service{DB: pool, Issuer: issuer, Asset: "nep141:usdc.fakes.testnet", TTL: time.Hour, Now: time.Now, MainnetEnabled: true}
+	inv := &invoices.Service{DB: pool, Issuer: issuer, Asset: "nep141:usdc.fakes.testnet", TTL: time.Hour, Now: time.Now, MainnetEnabled: true, MainnetMax: 10_000_000} // a bigger cap than the product default, so the amounts here stay readable
 	addrSeq++
 	fi := &fakeIntents{status: "", amountIn: "2004000", addr: fmt.Sprintf("0xtestdeposit%d%d", time.Now().UnixNano(), addrSeq)}
 	bal := &fakeBalance{v: big.NewInt(10_000_000)}
@@ -147,7 +147,7 @@ func TestPayinQuoteIsBoundToTheInvoice(t *testing.T) {
 	}
 	r := e.fi.quotes[0]
 	if r.Dry || r.SwapType != "EXACT_OUTPUT" || r.DestinationAsset != invoices.MainnetUSDC || r.Amount != inv.Amount ||
-		r.Recipient != inv.Payout || r.RefundTo != goodRefund || r.OriginAsset != baseUSDC {
+		r.Recipient != inv.Payout || r.RecipientType != "INTENTS" || r.RefundTo != goodRefund || r.OriginAsset != baseUSDC {
 		t.Fatalf("the quote must be bound to this invoice: %+v", r)
 	}
 	if q.AmountIn != "2.004" || q.Status != payin.StatusWaiting || q.DepositAddr != e.fi.addr {

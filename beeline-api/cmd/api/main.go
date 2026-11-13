@@ -127,7 +127,6 @@ func run() error {
 	// pay-in from other chains (NEAR Intents) exists only for them.
 	var claimsMainnet httpapi.ClaimVerifier
 	var payIn *payin.Service
-	var storage httpapi.StorageChecker
 	if inv != nil && os.Getenv("MAINNET_INVOICES") == "on" {
 		rpc := chainverify.NewHTTPRPC(urlList("NEAR_MAINNET_RPC_URLS", "https://archival-rpc.mainnet.fastnear.com,https://archival-rpc.mainnet.near.org"), 25*time.Second)
 		claimsMainnet = &chainverify.Verifier{RPC: rpc}
@@ -137,7 +136,6 @@ func run() error {
 		}
 		reader := &chainverify.BalanceReader{RPC: rpc}
 		payIn = &payin.Service{DB: pool, Intents: provider, Tokens: provider, Balance: reader, Invoices: inv, Now: time.Now}
-		storage = reader
 		log.Info("real-money invoices enabled (mainnet)", "cap_units", inv.MainnetMax)
 	}
 	router := httpapi.NewRouter(httpapi.Deps{
@@ -159,7 +157,6 @@ func run() error {
 		Claims:             claimVerifier(),
 		ClaimsMainnet:      claimsMainnet,
 		PayIn:              payIn,
-		Storage:            storage,
 		Guard:              guardSvc,
 		ChatModel:          envOr("NEAR_AI_AGENT_MODEL", "z-ai/glm-5.3-flash"),
 		Privy:              privy,

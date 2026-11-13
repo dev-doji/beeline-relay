@@ -7,10 +7,16 @@ import (
 )
 
 // viewRPC is a TEST DOUBLE: it answers a NEAR view call with fixed result bytes (as the node returns them,
-// an array of byte values).
-type viewRPC struct{ result string }
+// an array of byte values) and records the call.
+type viewRPC struct {
+	result string
+	seen   *map[string]any
+}
 
-func (f viewRPC) Call(_ context.Context, _ string, _ any, out any) error {
+func (f viewRPC) Call(_ context.Context, _ string, params any, out any) error {
+	if f.seen != nil {
+		*f.seen = params.(map[string]any)
+	}
 	bytes := []int{}
 	for _, c := range []byte(f.result) {
 		bytes = append(bytes, int(c))
@@ -19,27 +25,19 @@ func (f viewRPC) Call(_ context.Context, _ string, _ any, out any) error {
 	return json.Unmarshal(raw, out)
 }
 
-func TestBalanceReaderParsesAFungibleTokenBalance(t *testing.T) {
-	b := &BalanceReader{RPC: viewRPC{`"2500000"`}}
-	n, err := b.FTBalance(context.Background(), "usdc.example", "vendor.near")
+func TestIntentsBalanceReadsTheVerifierContract(t *testing.T) {
+	var seen map[string]any
+	b := &BalanceReader{RPC: viewRPC{`"2500000"`, &seen}}
+	n, err := b.IntentsBalance(context.Background(), "vendor.near", "nep141:usdc")
 	if err != nil || n.String() != "2500000" {
 		t.Fatalf("balance = %v, %v", n, err)
 	}
-	if _, err := (&BalanceReader{RPC: viewRPC{`"abc"`}}).FTBalance(context.Background(), "t", "a"); err == nil {
-		t.Fatal("a non-numeric balance must be an error")
+	if seen["account_id"] != IntentsContract || seen["method_name"] != "mt_balance_of" {
+		t.Fatalf("must read mt_balance_of on the Intents contract: %v", seen)
 	}
-	if _, err := (&BalanceReader{RPC: viewRPC{`"-5"`}}).FTBalance(context.Background(), "t", "a"); err == nil {
-		t.Fatal("a negative balance must be an error")
-	}
-}
-
-func TestStorageRegisteredTellsRegisteredFromUnregistered(t *testing.T) {
-	reg := &BalanceReader{RPC: viewRPC{`{"total":"1250000000000000000000","available":"0"}`}}
-	if ok, err := reg.StorageRegistered(context.Background(), "t", "a"); err != nil || !ok {
-		t.Fatalf("registered account: %v %v", ok, err)
-	}
-	none := &BalanceReader{RPC: viewRPC{`null`}}
-	if ok, err := none.StorageRegistered(context.Background(), "t", "a"); err != nil || ok {
-		t.Fatalf("unregistered account (null): %v %v", ok, err)
+	for _, bad := range []string{`"abc"`, `"-5"`, ``} {
+		if _, err := (&BalanceReader{RPC: viewRPC{result: bad}}).IntentsBalance(context.Background(), "a", "t"); err == nil {
+			t.Errorf("%q must be an error", bad)
+		}
 	}
 }

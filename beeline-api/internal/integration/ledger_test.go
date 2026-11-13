@@ -26,7 +26,7 @@ func TestLedgerTotalsAreSeparateForTestAndRealMoneyAndOnlyCountPaymentsTheServer
 		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, uid)
 	})
 	_, issuer, _ := ed25519.GenerateKey(rand.Reader)
-	svc := &invoices.Service{DB: pool, Issuer: issuer, Asset: "nep141:usdc.fakes.testnet", TTL: time.Hour, Now: time.Now, MainnetEnabled: true}
+	svc := &invoices.Service{DB: pool, Issuer: issuer, Asset: "nep141:usdc.fakes.testnet", TTL: time.Hour, Now: time.Now, MainnetEnabled: true, MainnetMax: 10_000_000}
 	item := func(units string) []invoices.Item {
 		return []invoices.Item{{Name: "Thing", Quantity: 1, UnitPrice: units}}
 	}

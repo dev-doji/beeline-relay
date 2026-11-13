@@ -3,8 +3,10 @@
 // shows the customer what to send, and tracks the payment. Docs: https://docs.near-intents.org/
 //
 // How "paid" stays honest (docs/PAYMENT_FLOW.md): an invoice becomes paid only when TWO independent signals
-// agree: NEAR Intents reports the swap SUCCESS (provider-reported), and the vendor's own USDC balance on NEAR,
-// read from the chain, rose by at least the invoice amount since the quote was made. A provider that lies, or a
+// agree: NEAR Intents reports the swap SUCCESS (provider-reported), and the vendor's own USDC balance inside
+// NEAR Intents (mt_balance_of on intents.near, read from the chain) rose by at least the invoice amount since the
+// quote was made. The money is delivered to that Intents balance, so the vendor's account needs no USDC registration
+// and no NEAR for gas. A provider that lies, or a
 // balance that rose for another reason, is not enough on its own. Known limit: an unrelated incoming transfer
 // to the vendor can satisfy the balance signal, but the provider signal must still be SUCCESS for this
 // invoice's own deposit address.
@@ -63,9 +65,9 @@ type TokenSource interface {
 	Tokens(ctx context.Context) ([]intents.Token, error)
 }
 
-// BalanceReader reads a fungible-token balance on NEAR (base units).
+// BalanceReader reads an account's balance of an asset inside NEAR Intents (base units).
 type BalanceReader interface {
-	FTBalance(ctx context.Context, token, account string) (*big.Int, error)
+	IntentsBalance(ctx context.Context, account, assetID string) (*big.Int, error)
 }
 
 // chainNames are the origin chains offered, in display order. NEAR itself is left out: paying from NEAR has its own path.
@@ -302,7 +304,7 @@ func (s *Service) Create(ctx context.Context, inv *invoices.Invoice, originAsset
 	}
 
 	// Baseline for the delivery check: what the vendor holds right now.
-	before, err := s.Balance.FTBalance(ctx, token(inv), inv.Payout)
+	before, err := s.Balance.IntentsBalance(ctx, inv.Payout, inv.Asset)
 	if err != nil {
 		return nil, fmt.Errorf("read vendor balance: %w", err)
 	}
@@ -310,7 +312,7 @@ func (s *Service) Create(ctx context.Context, inv *invoices.Invoice, originAsset
 		Dry: false, SwapType: "EXACT_OUTPUT", SlippageTolerance: 100,
 		OriginAsset: opt.AssetID, DepositType: "ORIGIN_CHAIN", DestinationAsset: inv.Asset,
 		Amount: inv.Amount, RefundTo: refundTo, RefundType: "ORIGIN_CHAIN",
-		Recipient: inv.Payout, RecipientType: "DESTINATION_CHAIN",
+		Recipient: inv.Payout, RecipientType: "INTENTS", // lands in the vendor's NEAR Intents balance: no token registration, no gas
 		Deadline: deadline.Format("2006-01-02T15:04:05.000Z"),
 	})
 	if err != nil {
@@ -383,7 +385,7 @@ func (s *Service) Refresh(ctx context.Context, inv *invoices.Invoice) (*Quote, e
 
 	balanceAfter := ""
 	if next == StatusConfirming {
-		after, err := s.Balance.FTBalance(ctx, token(inv), inv.Payout)
+		after, err := s.Balance.IntentsBalance(ctx, inv.Payout, inv.Asset)
 		if err == nil {
 			balanceAfter = after.String()
 			before, _ := new(big.Int).SetString(q.balanceBefore, 10)

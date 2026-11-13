@@ -150,13 +150,6 @@ func (c *chatHost) CreateInvoice(ctx context.Context, items []invoices.Item) (*i
 	if _, err := c.h.d.Invoices.Check(&ci); err != nil {
 		return nil, err // a request problem (for example a cap): the agent explains it
 	}
-	if c.h.d.Storage != nil {
-		// Money delivered to an account that is not registered with the USDC contract can fail to arrive. Check first.
-		token := strings.TrimPrefix(invoices.MainnetUSDC, "nep141:")
-		if ok, err := c.h.d.Storage.StorageRegistered(ctx, token, strings.ToLower(c.user.NearAccount)); err == nil && !ok {
-			return nil, errors.New("your payout account " + c.user.NearAccount + " is not set up to hold USDC on NEAR yet. Receive a small amount of USDC into it once from a wallet or exchange (this registers it), then make the invoice again")
-		}
-	}
 	return c.h.d.Invoices.CreateFor(ctx, c.uid, ci)
 }
 
