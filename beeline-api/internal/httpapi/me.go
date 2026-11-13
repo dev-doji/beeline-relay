@@ -267,7 +267,17 @@ func (h *handlers) parserTurn(ctx context.Context, host *chatHost, msg string) *
 	if host.user.ShopName == "" || host.user.NearAccount == "" {
 		return &accounts.Result{Reply: "First, tell me your shop name and the NEAR account that should receive the money.", NeedsProfile: true}
 	}
-	items, err := accounts.ParseInvoice(msg)
+	var items []invoices.Item
+	var err error
+	if accounts.WantsNaira(msg) {
+		rate, rerr := host.NGNRate(ctx)
+		if rerr != nil {
+			return &accounts.Result{Reply: "I could not get today's naira rate right now. Try again in a moment, or price in USDC."}
+		}
+		items, err = accounts.ParseInvoiceNGN(msg, rate)
+	} else {
+		items, err = accounts.ParseInvoice(msg)
+	}
 	if err != nil {
 		return &accounts.Result{Reply: err.Error()}
 	}

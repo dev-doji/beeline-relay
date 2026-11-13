@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
@@ -72,5 +73,26 @@ func TestValidateProfile(t *testing.T) {
 		if _, _, err := ValidateProfile(c[0], c[1]); err == nil {
 			t.Errorf("accepted %v", c)
 		}
+	}
+}
+
+func TestParserHandlesPoliteAndNairaPhrasings(t *testing.T) {
+	// The exact messages that failed on the live site.
+	for _, msg := range []string{"make me an invoice for 5 inks for 100 naira per ink", "yes so create the invoice for 5 inks for me at 100 naira"} {
+		items, err := ParseInvoiceNGN(msg, "1000")
+		if err != nil {
+			t.Fatalf("%q: %v", msg, err)
+		}
+		if len(items) != 1 || items[0].Quantity != 5 || items[0].UnitPrice != "100000" || !strings.HasPrefix(items[0].Name, "inks") || !strings.Contains(items[0].Name, "₦100") {
+			t.Fatalf("%q -> %+v", msg, items)
+		}
+	}
+	items, err := ParseInvoiceNGN("invoice 2 x laptops 600,000 naira", "1000")
+	if err != nil || items[0].Quantity != 2 || items[0].UnitPrice != "600000000" {
+		t.Fatalf("commas and x quantity: %+v %v", items, err)
+	}
+	// The USDC phrasing is unchanged, including "25 for 3 logos" not reading 25 as a quantity.
+	if items, err := ParseInvoice("invoice 25 for logo design"); err != nil || items[0].UnitPrice != "25000000" || items[0].Quantity != 1 {
+		t.Fatalf("usdc: %+v %v", items, err)
 	}
 }

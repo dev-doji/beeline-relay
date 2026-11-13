@@ -20,6 +20,9 @@ var (
 // wantsNaira is true only when the user's own message says the prices are in naira. The model cannot decide that.
 func wantsNaira(userMsg string) bool { return nairaWordRe.MatchString(userMsg) }
 
+// WantsNaira lets the HTTP layer apply the same rule to the command-parser fallback.
+func WantsNaira(userMsg string) bool { return wantsNaira(userMsg) }
+
 // ngnToUnits converts a naira amount to USDC base units (6 decimals), rounding UP so the vendor is never
 // short of the naira value. rate is naira per 1 USDC as a decimal string. No floating point.
 func ngnToUnits(ngn, rate string) (string, error) {
