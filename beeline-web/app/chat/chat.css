@@ -144,6 +144,12 @@
 .cx-recent-item { width: 100%; border: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
 @media (max-width: 900px) { .cx-detail { grid-template-columns: minmax(0, 1fr); } }
 
+.cx-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cx-events li { display: grid; gap: 2px; padding: 9px 12px; border: 0.8px solid #f3c9c4; border-radius: 12px; background: #fff7f6; }
+.cx-events b { font-size: 13px; color: #b42318; }
+.cx-events span { font-size: 12.5px; color: var(--cx-desc); line-height: 1.5; }
+.cx-events time { font-size: 11px; color: var(--cx-muted); }
+
 /* Composer and "/" menu */
 .cx-dock { position: relative; flex: none; width: min(760px, calc(100% - 48px)); margin: 0 auto; padding: 0 0 14px; }
 .cx-composer { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 12px; background: #fff; border: 0.8px solid var(--cx-line); border-radius: 999px;

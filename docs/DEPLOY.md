@@ -39,6 +39,12 @@ Open the website, go to **Monitor**, add a request and press **Run monitor**.
 
 ---
 
+## Paying from a wallet
+
+The API verifies wallet payments by reading NEAR itself, so it needs an RPC that can look up older transactions. By default it uses the
+archival endpoints `archival-rpc.testnet.fastnear.com` and `archival-rpc.testnet.near.org`. To change them, set `NEAR_VERIFY_RPC_URLS` on Render
+(comma-separated). Nothing else is needed. The wallet picker runs in the browser.
+
 ## Sign-in and Bee (Privy + NEAR AI)
 
 1. **Privy** (dashboard.privy.io): in the app's settings enable **Email** login and an embedded wallet for **NEAR**, and add `https://usebeeline.xyz`, `https://www.usebeeline.xyz` and `http://localhost:3001` as allowed origins.

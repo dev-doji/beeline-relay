@@ -180,8 +180,30 @@ export interface Invoice {
   status: "open" | "paid";
   paid_tx: string | null;
   paid_at: string | null;
+  /** Set only when the server read the payment from the chain and it matched the invoice. */
+  payment?: Payment | null;
   created_at: string;
   expires_at: string;
+}
+
+export interface Payment {
+  tx_hash: string;
+  sender: string;
+  receiver: string;
+  token: string;
+  amount: string;
+  memo: string;
+  block_hash: string;
+  block_time: string;
+  verification: "chain-verified";
+  verified_at: string;
+}
+
+export interface InvoiceEvent {
+  kind: string;
+  reason: string;
+  tx_hash: string;
+  created_at: string;
 }
 
 export interface CreateInvoiceInput {
@@ -348,3 +370,25 @@ export const meMessages = (token: string) => request<{ data: ChatMessage[] }>("/
 
 export const meChat = (token: string, message: string, wallet: string) =>
   request<ChatReply>("/api/v1/me/chat", authed(token, { method: "POST", body: JSON.stringify({ message, wallet }) }));
+
+// ---- Paying from a wallet: the server reads the transaction from NEAR before anything counts as paid ----
+
+export type ClaimResult =
+  | { status: "verified"; payment: Payment }
+  | { status: "pending"; message: string };
+
+/** The memo a payment must carry so it is bound to exactly this invoice. */
+export const invoiceMemo = (id: string) => `beeline:${id}`;
+
+/** The token contract of an invoice's asset ("nep141:usdc.fakes.testnet" -> "usdc.fakes.testnet"). */
+export const tokenContract = (asset: string) => asset.replace(/^nep141:/, "");
+
+/** Asks the server to verify a payment. 200 verified, 202 pending (ask again); 4xx rejected (ApiError with the reason). */
+export const claimPayment = (invoiceId: string, txHash: string, senderAccountId: string) =>
+  request<ClaimResult>(`/api/v1/playground/invoices/${encodeURIComponent(invoiceId)}/claims`, {
+    method: "POST",
+    body: JSON.stringify({ tx_hash: txHash, sender_account_id: senderAccountId }),
+  });
+
+export const getInvoiceEvents = (invoiceId: string) =>
+  request<{ data: InvoiceEvent[] }>(`/api/v1/playground/invoices/${encodeURIComponent(invoiceId)}/events`);

@@ -1,10 +1,11 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Check, ShieldCheck } from "lucide-react";
 import { Receipt } from "@/components/invoice/Receipt";
 import { TX_URL, formatUSDC, shortKey } from "@/lib/api";
+import { PaySheet } from "./PaySheet";
 import { usePay } from "./usePay";
 
 /**
@@ -14,7 +15,8 @@ import { usePay } from "./usePay";
  */
 export function PayContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { invoice, loadError, current, busy, send } = usePay(id);
+  const { invoice, loadError, current, busy, send, reload } = usePay(id);
+  const [open, setOpen] = useState(false);
 
   if (loadError) {
     return (
@@ -71,15 +73,23 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
       />
 
       {paid && invoice.paid_tx ? (
-        <a className="px-btn ok lg full" href={TX_URL + invoice.paid_tx} target="_blank" rel="noreferrer">
-          <Check size={16} aria-hidden /> Paid · view the transaction {shortKey(invoice.paid_tx, 5)} <ArrowUpRight size={14} aria-hidden />
-        </a>
+        <>
+          <a className="px-btn ok lg full" href={TX_URL + invoice.paid_tx} target="_blank" rel="noreferrer">
+            <Check size={16} aria-hidden /> Paid · view the transaction {shortKey(invoice.paid_tx, 5)} <ArrowUpRight size={14} aria-hidden />
+          </a>
+          <p className="px-note">
+            {invoice.payment
+              ? "Verified on NEAR: Beeline read this payment from the chain and it matched the invoice."
+              : "Demo payment: a test agent paid from Beeline’s shared test vault."}
+          </p>
+        </>
       ) : (
         <>
-          <button className="px-btn dark lg full" onClick={() => void send({})} disabled={busy}>
-            {busy ? "Paying…" : `Pay ${formatUSDC(invoice.amount)} USDC`}
+          <button className="px-btn dark lg full" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+            Pay {formatUSDC(invoice.amount)} USDC
           </button>
           <p className="px-note">Test payment on NEAR testnet. No real money moves.</p>
+          {open && <PaySheet invoice={invoice} onPaid={() => void reload()} onDemo={() => void send({})} demoBusy={busy} />}
         </>
       )}
 

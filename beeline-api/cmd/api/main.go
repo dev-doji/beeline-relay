@@ -20,6 +20,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/agent"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/chainverify"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/config"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/httpapi"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
@@ -128,6 +129,7 @@ func run() error {
 		Intents:            provider,
 		Accounts:           acct,
 		Chat:               chatCompleter(chatAI),
+		Claims:             claimVerifier(),
 		ChatModel:          envOr("NEAR_AI_AGENT_MODEL", "z-ai/glm-5.3-flash"),
 		Privy:              privy,
 		CashoutLive:        os.Getenv("CASHOUT_LIVE") == "on",
@@ -194,4 +196,19 @@ func chatCompleter(c *nearai.Client) accounts.Completer {
 		return nil
 	}
 	return c
+}
+
+// claimVerifier reads wallet payments from NEAR. Archival-capable endpoints come first because a normal
+// node cannot look up older transactions (checked 2026-11-13). Override with NEAR_VERIFY_RPC_URLS.
+func claimVerifier() *chainverify.Verifier {
+	urls := []string{"https://archival-rpc.testnet.fastnear.com", "https://archival-rpc.testnet.near.org"}
+	if v := strings.TrimSpace(os.Getenv("NEAR_VERIFY_RPC_URLS")); v != "" {
+		urls = nil
+		for _, u := range strings.Split(v, ",") {
+			if u = strings.TrimSpace(u); u != "" {
+				urls = append(urls, u)
+			}
+		}
+	}
+	return &chainverify.Verifier{RPC: chainverify.NewHTTPRPC(urls, 25*time.Second)}
 }

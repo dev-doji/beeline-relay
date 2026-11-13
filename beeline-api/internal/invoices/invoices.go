@@ -74,8 +74,10 @@ type Invoice struct {
 	Status       string     `json:"status"` // open | paid
 	PaidTx       *string    `json:"paid_tx"`
 	PaidAt       *time.Time `json:"paid_at"`
-	CreatedAt    time.Time  `json:"created_at"`
-	ExpiresAt    time.Time  `json:"expires_at"`
+	// Payment is set only when the server read the payment from the chain and it matched the invoice.
+	Payment   *Payment  `json:"payment"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type Service struct {
@@ -180,6 +182,7 @@ func (s *Service) Get(ctx context.Context, id string) (*Invoice, error) {
 		return nil, err
 	}
 	_ = json.Unmarshal(items, &inv.Items)
+	inv.Payment, _ = s.PaymentFor(ctx, id)
 	return &inv, nil
 }
 

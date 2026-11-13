@@ -135,6 +135,29 @@
 .px-card input:focus { outline: none; border-color: #d69e2e; box-shadow: 0 0 0 3px rgba(245, 196, 81, 0.28); }
 .px-payee { font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; color: var(--px-ink); word-break: break-all; padding: 8px 10px; background: var(--px-bg); border-radius: 10px; }
 
+/* Pay sheet: wallet payment and manual transfer */
+.px-sheet { display: grid; gap: 10px; padding: 14px; background: #fff; border: 0.8px solid var(--px-line); border-radius: 14px; box-shadow: 0 1px 3px rgba(20, 20, 40, 0.04); }
+.px-sheet-sec { display: grid; gap: 8px; }
+.px-sheet-sec + .px-sheet-sec { padding-top: 10px; border-top: 0.8px solid var(--px-line); }
+.px-sheet-sec > b { font-size: 13px; font-weight: 600; color: var(--px-ink); }
+.px-sheet-sec > p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--px-desc); }
+.px-sheet-sec.demo { grid-template-columns: auto 1fr; align-items: center; }
+.px-sheet-sec.demo span { font-size: 11.5px; color: var(--px-muted); line-height: 1.4; }
+.px-copy { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; background: var(--px-bg); border-radius: 9px; }
+.px-copy-label { font-size: 11px; color: var(--px-muted); }
+.px-copy code { font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--px-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.px-copy-btn { width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--px-desc); cursor: pointer; }
+.px-copy-btn:hover { background: #ececf2; color: var(--px-ink); }
+.px-grid2.tight { gap: 8px; }
+.px-in { display: grid; gap: 4px; min-width: 0; }
+.px-in > span { font-size: 11.5px; font-weight: 600; color: var(--px-desc); }
+.px-in input { width: 100%; height: 34px; padding: 0 10px; border: 0.8px solid #dcdae6; border-radius: 9px; background: #fff; font: 13px Inter, system-ui, sans-serif; color: var(--px-ink); min-height: 0; }
+.px-in input:focus { outline: none; border-color: #d69e2e; box-shadow: 0 0 0 3px rgba(245, 196, 81, 0.28); }
+.px-status { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 10px; background: var(--px-soft); color: var(--px-soft-ink); font-size: 12.5px; }
+.px-spin { animation: px-rot 0.9s linear infinite; }
+@keyframes px-rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .px-spin { animation: none; } }
+
 /* Customer pay page */
 .px-note { margin: -4px 0 0; text-align: center; font-size: 12px; color: var(--px-muted); }
 .px-secure { display: grid; gap: 8px; padding: 12px 14px; background: #fff; border: 0.8px solid var(--px-line); border-radius: 12px; }
@@ -156,7 +179,7 @@
   .px-grid2 { grid-template-columns: 1fr; }
   .px-dare { flex-direction: column; align-items: flex-start; }
   /* 16 px keeps iPhones from zooming into a field on focus */
-  .px-trick textarea, .px-trick input, .px-card input { font-size: 16px; }
+  .px-trick textarea, .px-trick input, .px-card input, .px-in input { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .px-btn { transition: none; }

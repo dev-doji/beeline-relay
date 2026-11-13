@@ -1,7 +1,8 @@
 # Real payment flow: a customer pays from their own wallet
 
-Status: **design, 2026-11-13. Nothing in this file is built yet.** It replaces the current "Pay" button, which makes a
-test agent pay from a shared testnet vault. Docs checked on 2026-11-13: NEAR RPC `tx`
+Status: **Phase 1 built 2026-11-13** (verifier `internal/chainverify`, claim API and tables, the pay sheet, vendor evidence and
+security events). **Not yet verified with a real signed wallet payment.** Phases 2 and 3 are not built. The old test-agent
+payment stays as a labelled "Demo payment". Docs checked on 2026-11-13: NEAR RPC `tx`
 (<https://docs.near.org/api/rpc/transactions>), NEP-141 (<https://github.com/near/NEPs/blob/master/neps/nep-0141.md>),
 NEAR Connect (<https://docs.near.org/web3-apps/concepts/web-login>).
 

@@ -68,6 +68,8 @@ type Deps struct {
 	// Chat is the NEAR AI model behind Bee, the signed-in assistant; nil falls back to the command parser.
 	Chat      accounts.Completer
 	ChatModel string
+	// Claims verifies wallet payments against the chain; nil disables POST /playground/invoices/{id}/claims.
+	Claims ClaimVerifier
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -99,6 +101,8 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/playground/invoices/{id}", h.getInvoice)
 		r.Post("/playground/invoices/{id}/pay", h.payInvoice)
 		r.Get("/playground/invoices/{id}/attempts", h.invoiceAttempts)
+		r.Post("/playground/invoices/{id}/claims", h.claimInvoice)
+		r.Get("/playground/invoices/{id}/events", h.invoiceEvents)
 		r.Get("/playground/attempts", h.attackLog)
 		r.Post("/cashout/quote", h.cashoutQuote)
 		r.Post("/cashout/start", h.cashoutStart)

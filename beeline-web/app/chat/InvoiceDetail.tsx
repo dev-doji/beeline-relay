@@ -6,7 +6,23 @@ import { ArrowLeft, ExternalLink, ShieldCheck } from "lucide-react";
 import { Receipt } from "@/components/invoice/Receipt";
 import { ShareLink } from "@/components/invoice/ShareLink";
 import { AttemptList } from "@/components/attacks/AttemptList";
-import { type Attempt, type Invoice, formatUSDC, getInvoiceAttempts } from "@/lib/api";
+import { type Attempt, type Invoice, type InvoiceEvent, TX_URL, formatUSDC, getInvoiceAttempts, getInvoiceEvents, shortKey } from "@/lib/api";
+
+// Plain labels for the reasons Beeline refuses a payment claim.
+const EVENT_TITLE: Record<string, string> = {
+  WRONG_TOKEN: "Wrong token",
+  WRONG_AMOUNT: "Wrong amount",
+  WRONG_RECEIVER: "Wrong payee",
+  WRONG_MEMO: "Not matched to this invoice",
+  WRONG_DEPOSIT: "Not a plain transfer",
+  WRONG_SENDER: "Sender did not match",
+  UNSUPPORTED_CALL: "Unsupported transaction",
+  TX_FAILED: "Transaction failed",
+  TX_NOT_FOUND: "Transaction not found",
+  EXPIRED: "Paid after the invoice expired",
+  ALREADY_PAID: "Second payment refused",
+  TX_REUSED: "Transaction already used",
+};
 
 /**
  * The vendor's view of one invoice, inside the app (the sidebar stays). It shows the invoice the way the
@@ -14,12 +30,17 @@ import { type Attempt, type Invoice, formatUSDC, getInvoiceAttempts } from "@/li
  */
 export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => void }) {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [events, setEvents] = useState<InvoiceEvent[]>([]);
   useEffect(() => {
     let stop = false;
-    const load = () =>
+    const load = () => {
       getInvoiceAttempts(invoice.id)
         .then((r) => !stop && setAttempts(r.data))
         .catch(() => undefined);
+      getInvoiceEvents(invoice.id)
+        .then((r) => !stop && setEvents(r.data))
+        .catch(() => undefined);
+    };
     void load();
     const t = setInterval(load, 15000);
     return () => {
@@ -29,7 +50,7 @@ export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: (
   }, [invoice.id]);
 
   const link = `${window.location.origin}/pay/${invoice.id}`;
-  const blocked = attempts.filter((a) => a.outcome === "blocked").length;
+  const blocked = attempts.filter((a) => a.outcome === "blocked").length + events.length;
 
   return (
     <div className="cx-panel-view">
@@ -55,6 +76,25 @@ export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: (
           <Link className="cx-link" href={`/pay/${invoice.id}`} target="_blank">
             <ExternalLink size={13} aria-hidden /> Open the page your customer sees
           </Link>
+          <div className="cx-box">
+            <div className="cx-box-top">
+              <b className="cx-sec">Payment</b>
+              <span className={invoice.status === "paid" ? "cx-tag ok" : "cx-tag"}>{invoice.status === "paid" ? "Paid" : "Waiting"}</span>
+            </div>
+            {invoice.payment ? (
+              <p className="cx-small">
+                <b>Verified on-chain.</b> Beeline read this payment from NEAR: {formatUSDC(invoice.payment.amount)} USDC from {invoice.payment.sender}, in a final block on{" "}
+                {new Date(invoice.payment.block_time).toLocaleString()}.{" "}
+                <a className="cx-link" href={TX_URL + invoice.payment.tx_hash} target="_blank" rel="noreferrer">
+                  Transaction {shortKey(invoice.payment.tx_hash, 5)}
+                </a>
+              </p>
+            ) : invoice.status === "paid" ? (
+              <p className="cx-small">Paid by a demo payment (a test agent paid from the shared test vault), not a customer wallet.</p>
+            ) : (
+              <p className="cx-small">Nothing received yet. A payment counts only after Beeline reads it from NEAR and it matches this invoice exactly.</p>
+            )}
+          </div>
         </div>
         <div className="cx-detail-side">
           <div className="cx-box">
@@ -74,7 +114,18 @@ export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: (
               Beeline checks every payment against this signed invoice. A different account, a different amount, an edited link or a second payment is blocked
               automatically, and it shows up here.
             </p>
-            <AttemptList attempts={attempts} empty="Nothing suspicious so far. Payments are checked automatically." />
+            {events.length > 0 && (
+              <ul className="cx-events">
+                {events.map((e, i) => (
+                  <li key={i}>
+                    <b>{EVENT_TITLE[e.kind] ?? e.kind}</b>
+                    <span>{e.reason}</span>
+                    <time>{new Date(e.created_at).toLocaleString()}</time>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <AttemptList attempts={attempts} empty={events.length ? "" : "Nothing suspicious so far. Payments are checked automatically."} />
           </div>
         </div>
       </div>

@@ -70,5 +70,14 @@ export function usePay(id: string) {
     }
   }
 
-  return { invoice, state, attempts, loadError, current, busy, send };
+  // Re-read the invoice from the server (after a wallet payment was verified).
+  const reload = useCallback(async () => {
+    try {
+      setInvoice(await getInvoice(id));
+    } catch {
+      /* keep what is on screen */
+    }
+  }, [id]);
+
+  return { invoice, state, attempts, loadError, current, busy, send, reload };
 }
