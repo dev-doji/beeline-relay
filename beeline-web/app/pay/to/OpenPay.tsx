@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Store } from "lucide-react";
-import { AppFrame } from "@/components/AppFrame";
+import { ArrowRight } from "lucide-react";
+import { PayShell } from "@/components/pay/PayShell";
 import { ApiError, createInvoice, formatUSDC, toBaseUnits } from "@/lib/api";
 
 const NEAR_ACCOUNT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -46,46 +46,42 @@ export function OpenPay({ name, to, note }: { name: string; to: string; note: st
   }
 
   return (
-    <AppFrame active="vendor" title="Pay" icon={<Store size={16} aria-hidden />}>
-      <div className="frame-inner">
-        <div className="page-head">
-          <span className="pill pill-honey">
-            <Store size={13} aria-hidden /> Permanent link · NEAR testnet
-          </span>
+    <PayShell>
+      <div className="px-wrap narrow">
+        <span className="px-chip" style={{ justifySelf: "start" }}>Permanent link · NEAR testnet</span>
+        <div className="px-card">
           <h1>{payeeOk ? `Pay ${shop}` : "This link is incomplete"}</h1>
           <p>
             {payeeOk
               ? "Choose an amount. Beeline signs a one-time invoice for you, and the vault pays only this exact payee and amount, once."
               : "A permanent pay link needs a payee account. Ask the vendor to send it again."}
           </p>
-        </div>
-        {payeeOk && (
-          <div className="panel" style={{ maxWidth: 520 }}>
-            <h2>Payee</h2>
-            <p className="help" style={{ wordBreak: "break-all" }}>
-              {payee} {note && <>· {note}</>}
-            </p>
-            <p className="help">
-              Check this account is the one you expect. This link carries the payee in its address; Beeline cannot tell you the vendor owns it.
-            </p>
-            <label className="field">
-              Amount (test USDC)
-              <input value={amount} inputMode="decimal" placeholder="0.50" onChange={(e) => setAmount(e.target.value)} />
-              {amount && !units && <span className="err">Enter an amount like 0.50.</span>}
-              {tooBig && <span className="err">Playground payments are capped at 5 test USDC (the testnet vault’s limit).</span>}
-              {units && !tooBig && <span className="help">You will pay {formatUSDC(units)} USDC.</span>}
-            </label>
-            {error && (
-              <div className="alert" role="alert">
-                {error}
+          {payeeOk && (
+            <>
+              <div className="px-payee">
+                {payee}
+                {note ? ` · ${note}` : ""}
               </div>
-            )}
-            <button className="btn btn-honey" onClick={() => void go()} disabled={!ready}>
-              {busy ? "Signing your invoice…" : "Continue"} <ArrowRight size={18} aria-hidden />
-            </button>
-          </div>
-        )}
+              <p>Check this is the account you expect. The link carries the payee in its address, so Beeline cannot tell you the vendor owns it.</p>
+              <label className="px-field">
+                <span>Amount (test USDC)</span>
+                <input value={amount} inputMode="decimal" placeholder="0.50" onChange={(e) => setAmount(e.target.value)} />
+                {amount && !units && <strong style={{ color: "#d92d20", fontSize: 11.5, fontWeight: 500 }}>Enter an amount like 0.50.</strong>}
+                {tooBig && <strong style={{ color: "#d92d20", fontSize: 11.5, fontWeight: 500 }}>Playground payments are capped at 5 test USDC.</strong>}
+                {units && !tooBig && <em>You will pay {formatUSDC(units)} USDC.</em>}
+              </label>
+              {error && (
+                <div className="alert" role="alert">
+                  {error}
+                </div>
+              )}
+              <button className="px-btn dark full" onClick={() => void go()} disabled={!ready}>
+                {busy ? "Signing your invoice…" : "Continue"} <ArrowRight size={15} aria-hidden />
+              </button>
+            </>
+          )}
+        </div>
       </div>
-    </AppFrame>
+    </PayShell>
   );
 }

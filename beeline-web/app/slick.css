@@ -1,0 +1,42 @@
+/* Slick pass: one compact scale for every page, loaded after globals.css and landing.css.
+   Buttons 34-36 px, inputs 36 px, cards 14-20 px radius, 0.8-1 px hairlines, quiet shadows.
+   Only shared primitives are touched; the pay page and chat app have their own stylesheets. */
+
+/* Buttons */
+.btn { min-height: 34px; padding: 0 14px; font-size: 13px; font-weight: 500; border-radius: 10px; gap: 7px; }
+.btn.big { min-height: 36px; font-size: 13px; }
+.pill-btn { min-height: 32px; padding: 0 13px; font-size: 12.5px; }
+.pbtn { min-height: 42px; padding: 0 20px; font-size: 12px; gap: 8px; }
+.pbtn.small { min-height: 34px; padding: 0 14px; font-size: 11px; }
+
+/* Inputs */
+.field { font-size: 12.5px; gap: 5px; }
+.field input, .field textarea { font-size: 14px; min-height: 36px; padding: 7px 11px; border-radius: 10px; border-width: 0.8px; }
+.field .help, .field .err { font-size: 12px; }
+.alert { padding: 9px 12px; border-radius: 10px; font-size: 13px; }
+
+/* Cards */
+.panel { border-width: 0.8px; box-shadow: 0 1px 3px rgba(20, 20, 40, 0.04); }
+.stat-row { gap: 10px; margin: 4px 0 14px; }
+.stat-card { padding: 12px 14px; border-radius: 14px; border-width: 0.8px; box-shadow: 0 1px 3px rgba(20, 20, 40, 0.04); }
+.stat-card b { font-size: 24px; }
+.stat-card span { font-size: 12px; }
+
+/* Landing */
+.pnav { height: 52px; }
+.pnav-logo { width: 38px; height: 38px; }
+.pnav-name { font-size: 16px; }
+.pnav-links a { padding: 6px 12px; font-size: 11px; }
+.lp-cta { gap: 10px; margin-top: 26px; }
+.bcard { min-height: 200px; padding: 18px; border-radius: 20px; border-width: 1px; }
+.bcard h3 { font-size: 21px; }
+.bcta h3 { font-size: 38px; }
+.pcard { padding: 14px 16px; border-radius: 16px; border-width: 1px; }
+.lp-band { padding: 52px 44px; border-radius: 28px; margin-top: 90px; }
+.lp-sec { padding-top: 80px; }
+
+@media (max-width: 640px) {
+  /* 16 px keeps iPhones from zooming into a field on focus */
+  .field input, .field textarea { font-size: 16px; }
+  .lp-band { padding: 40px 24px; border-radius: 22px; }
+}

@@ -104,8 +104,8 @@ export function Chat() {
             <button className="pill-btn ledger-toggle" onClick={() => setLedgerOpen((o) => !o)}>
               <PanelRight size={15} aria-hidden /> Live ledger
             </button>
-            <Link className="pill-btn dark" href="/vendor">
-              <Store size={15} aria-hidden /> Vendor pay links
+            <Link className="pill-btn dark" href="/chat">
+              <Store size={15} aria-hidden /> Open the app
             </Link>
           </div>
         </div>
@@ -131,8 +131,8 @@ export function Chat() {
                 bank account. Whatever I decide, the vault on NEAR testnet has the final say.
               </p>
               <div className="empty-ctas">
-                <Link className="pill-btn dark" href="/vendor">
-                  <Store size={15} aria-hidden /> Create a pay link and dare a friend
+                <Link className="pill-btn dark" href="/chat">
+                  <Store size={15} aria-hidden /> Make a pay link and dare a friend
                 </Link>
                 <Link className="pill-btn" href="/attacks">
                   <Activity size={15} aria-hidden /> See every attack so far <ArrowRight size={14} aria-hidden />

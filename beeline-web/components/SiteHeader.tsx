@@ -22,7 +22,6 @@ export function SiteHeader() {
         </span>
         <nav className="pnav-links" aria-label="Main">
           <Link href="/chat">Sign in</Link>
-          <Link href="/vendor">Quick link</Link>
           <Link href="/attacks">Attack log</Link>
           <a href="#routes">Share</a>
           <a href={REPO_URL} target="_blank" rel="noreferrer">

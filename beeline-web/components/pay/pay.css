@@ -1,0 +1,149 @@
+/* Pay link page: compact, light, and scrolls with the page (no inner scroll area).
+   Same tokens as the chat app. Controls are 34-36 px high, cards 14 px radius, text 12-14 px. */
+
+.px-page {
+  --px-bg: #f9fafb;
+  --px-ink: #16162a;
+  --px-text: #1e293b;
+  --px-line: #ecebf1;
+  --px-muted: #8e8c99;
+  --px-desc: #5c5a6b;
+  --px-honey: #f5c451;
+  --px-soft: #fdf1d2;
+  --px-soft-ink: #8a5a10;
+  min-height: 100dvh;
+  background: var(--px-bg);
+  color: var(--px-text);
+  font: 13.5px/1.5 Inter, "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+.px-page *, .px-page *::before, .px-page *::after { box-sizing: border-box; }
+
+/* Top bar */
+.px-top { display: flex; align-items: center; gap: 10px; height: 52px; max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+.px-brand { display: inline-flex; align-items: center; gap: 9px; color: var(--px-ink); text-decoration: none; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.px-logo { width: 24px; height: 24px; border-radius: 7px; background: var(--px-ink); display: grid; place-items: center; }
+.px-spacer { flex: 1; }
+.px-link { display: inline-flex; align-items: center; gap: 6px; color: var(--px-desc); text-decoration: none; font-size: 12.5px; font-weight: 500; padding: 6px 8px; border-radius: 8px; }
+.px-link:hover { background: #f1f1f6; color: var(--px-ink); }
+
+/* Buttons: 36 px, or 30 px small */
+.px-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 14px; border: 0.8px solid #dcdae6; border-radius: 10px; background: #fff; color: var(--px-ink);
+  font: 500 13px/1 Inter, system-ui, sans-serif; text-decoration: none; cursor: pointer; transition: background 0.15s, transform 0.12s; }
+.px-btn:hover { background: #f4f4f8; }
+.px-btn:active { transform: scale(0.98); }
+.px-btn.sm { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 9px; }
+.px-btn.full { width: 100%; }
+.px-btn.dark { background: var(--px-ink); border-color: var(--px-ink); color: #fff; }
+.px-btn.dark:hover { background: #2a2a44; }
+.px-btn.honey { background: var(--px-honey); border-color: var(--px-honey); color: var(--px-ink); font-weight: 600; }
+.px-btn.honey:hover { background: #ffd36e; }
+.px-btn.ok { background: #e7f6ec; border-color: #bfe6cc; color: #15803d; }
+.px-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.px-trick .px-btn.honey:disabled { background: #34344d; border-color: #34344d; color: #8d8da6; opacity: 1; }
+.px-page :focus-visible { outline: 2px solid var(--px-ink); outline-offset: 2px; border-radius: 8px; }
+
+/* Layout */
+.px-main { max-width: 1040px; margin: 0 auto; padding: 6px 20px 56px; }
+.px-wrap { display: grid; gap: 22px; }
+.px-wrap.narrow { max-width: 460px; margin: 0 auto; gap: 12px; }
+.px-cols { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.px-left, .px-right { display: grid; gap: 10px; min-width: 0; }
+.px-chip { justify-self: start; padding: 3px 10px; border-radius: 999px; background: var(--px-soft); color: var(--px-soft-ink); font-size: 11.5px; font-weight: 600; }
+
+/* Invoice receipt (shared component, tightened here) */
+.px-page .receipt { padding: 16px; border-radius: 14px; box-shadow: 0 1px 3px rgba(20, 20, 40, 0.04); }
+.px-page .receipt .initials { width: 34px; height: 34px; border-radius: 10px; font-size: 14px; }
+.px-page .receipt .vendor { gap: 10px; }
+.px-page .receipt .vendor b { font-size: 15px; }
+.px-page .receipt .vendor span { font-size: 12px; }
+.px-page .receipt .meta { margin: 12px 0 6px; font-size: 11.5px; }
+.px-page .receipt table { font-size: 13px; }
+.px-page .receipt td { padding: 6px 0; }
+.px-page .receipt .total { margin-top: 4px; padding-top: 9px; border-top-width: 1.5px; }
+.px-page .receipt .total span { font-size: 13px; }
+.px-page .receipt .total b { font-size: 22px; }
+.px-page .receipt .total b small { font-size: 12px; }
+.px-page .receipt .payto { margin-top: 8px; font-size: 12px; }
+.px-page .receipt .sigline { margin-top: 10px; font-size: 12px; }
+.px-page .receipt .rstamp { right: 14px; top: 14px; font-size: 14px; padding: 2px 10px; border-width: 2px; }
+.px-page .receipt .rstamp.open { font-size: 12px; }
+.px-page .receipt::after { display: none; }
+
+/* Payee account row */
+.px-acct { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 12px; background: #fff; border: 0.8px solid var(--px-line); border-radius: 12px; color: inherit; text-decoration: none; }
+.px-acct:hover { border-color: #dcdae6; }
+.px-acct-ic { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--px-soft); color: var(--px-soft-ink); }
+.px-acct-main { display: grid; min-width: 0; }
+.px-acct-main b { font-size: 12.5px; font-weight: 600; color: var(--px-ink); }
+.px-acct-main span { font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--px-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.px-acct-bal { text-align: right; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--px-ink); line-height: 1.1; }
+.px-acct-bal small { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; color: var(--px-muted); }
+
+/* "Dare someone" strip */
+.px-dare { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 0.8px dashed #d4d2e0; border-radius: 12px; font-size: 12px; color: var(--px-desc); line-height: 1.45; }
+.px-dare b { color: var(--px-ink); font-weight: 600; }
+.px-dare .px-btn { flex: none; }
+
+/* The trick panel */
+.px-trick { display: grid; gap: 10px; padding: 16px; border-radius: 14px; background: var(--px-ink); color: #fff; }
+.px-trick-head { display: flex; align-items: center; gap: 10px; }
+.px-trick-ic { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: rgba(245, 196, 81, 0.16); color: var(--px-honey); flex: none; }
+.px-trick h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.px-trick > p { margin: 0; color: #b9b9cc; font-size: 12.5px; line-height: 1.55; }
+.px-field { display: grid; gap: 5px; min-width: 0; }
+.px-field > span { font-size: 12px; font-weight: 600; color: #e7e7f0; }
+.px-field > em { font-style: normal; font-size: 11px; color: #8d8da6; }
+.px-field > strong { font-size: 11.5px; font-weight: 500; color: #ff8f84; }
+.px-trick textarea, .px-trick input { width: 100%; padding: 7px 10px; border: 0.8px solid #36364f; border-radius: 10px; background: #23233a; color: #fff; font: 13.5px/1.45 Inter, system-ui, sans-serif; min-height: 0; resize: none; }
+.px-trick input { height: 34px; }
+/* grows with its content instead of showing a scrollbar (browsers without field-sizing keep the fixed height) */
+.px-trick textarea { height: 76px; min-height: 76px; max-height: 220px; field-sizing: content; }
+.px-trick textarea::placeholder, .px-trick input::placeholder { color: #8d8da6; }
+.px-trick textarea:focus, .px-trick input:focus { outline: none; border-color: var(--px-honey); box-shadow: 0 0 0 3px rgba(245, 196, 81, 0.2); }
+.px-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.px-fine { margin: 0; font-size: 11px; color: #8d8da6; line-height: 1.45; }
+.px-attempt { display: grid; gap: 8px; scroll-margin-top: 16px; }
+
+/* Result cards from the shared chat components, tightened */
+.px-page .bubble { padding: 8px 12px; border-radius: 12px; font-size: 13px; }
+.px-page .thinking { padding: 10px 12px; border-radius: 12px; }
+.px-page .think-line { font-size: 13px; }
+.px-page .outcome { padding: 12px 14px; gap: 10px; }
+.px-page .outcome h4 { font-size: 15px; }
+.px-page .outcome p { font-size: 13px; }
+.px-page .outcome .big-ic { width: 32px; height: 32px; border-radius: 10px; }
+
+/* Attempts */
+.px-att { display: grid; gap: 10px; padding-top: 6px; }
+.px-att-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.px-att-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--px-ink); }
+.px-att-head span { font-size: 12px; color: var(--px-muted); }
+.px-page .att-list { gap: 8px; }
+.px-page .att-top { font-size: 12px; }
+.px-page .att-msg { font-size: 13px; }
+.px-page .att-edit, .px-page .att-foot { font-size: 12px; }
+.px-page .att-empty { padding: 18px; border-radius: 12px; font-size: 12.5px; }
+
+/* Open-amount page (/pay/to) */
+.px-card { display: grid; gap: 10px; padding: 16px; background: #fff; border: 0.8px solid var(--px-line); border-radius: 14px; box-shadow: 0 1px 3px rgba(20, 20, 40, 0.04); }
+.px-card h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--px-ink); }
+.px-card p { margin: 0; color: var(--px-desc); font-size: 12.5px; line-height: 1.55; }
+.px-card .px-field > span { color: var(--px-ink); }
+.px-card .px-field > em { color: var(--px-muted); }
+.px-card input { width: 100%; height: 36px; padding: 0 10px; border: 0.8px solid #dcdae6; border-radius: 10px; background: #fff; font: 14px Inter, system-ui, sans-serif; color: var(--px-ink); }
+.px-card input:focus { outline: none; border-color: #d69e2e; box-shadow: 0 0 0 3px rgba(245, 196, 81, 0.28); }
+.px-payee { font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; color: var(--px-ink); word-break: break-all; padding: 8px 10px; background: var(--px-bg); border-radius: 10px; }
+
+@media (max-width: 900px) {
+  .px-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .px-top, .px-main { padding-inline: 14px; }
+  .px-grid2 { grid-template-columns: 1fr; }
+  .px-dare { flex-direction: column; align-items: flex-start; }
+  /* 16 px keeps iPhones from zooming into a field on focus */
+  .px-trick textarea, .px-trick input, .px-card input { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .px-btn { transition: none; }
+}

@@ -29,8 +29,8 @@ export function SideNav({
           <X size={18} />
         </button>
       </div>
-      <Link className={`side-item ${active === "vendor" ? "active" : ""}`} href="/vendor">
-        <Store size={18} aria-hidden /> Create a payment link
+      <Link className={`side-item ${active === "vendor" ? "active" : ""}`} href="/chat">
+        <Store size={18} aria-hidden /> Open the app
       </Link>
       <Link className={`side-item ${active === "attacks" ? "active" : ""}`} href="/attacks">
         <Activity size={18} aria-hidden /> Attack log

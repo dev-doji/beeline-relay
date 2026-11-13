@@ -75,8 +75,8 @@ export default function AttacksPage() {
             ) : (
               <>
                 No attempts yet.{" "}
-                <Link href="/vendor">
-                  Create a pay link and dare someone <ArrowRight size={14} aria-hidden />
+                <Link href="/chat">
+                  Make a pay link and dare someone <ArrowRight size={14} aria-hidden />
                 </Link>
               </>
             )

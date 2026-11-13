@@ -131,8 +131,8 @@ export default function Home() {
             Online or in the shop: create an invoice, share the link on any app or show the QR at the counter. Customers pay in USDC, every payment is tracked, and a NEAR vault blocks anything that doesn’t match the signed invoice.
           </p>
           <div className="lp-cta rise" style={{ animationDelay: "200ms" }}>
-            <Link href="/vendor" className="pbtn dark">
-              Create a payment link <ArrowRight size={17} aria-hidden />
+            <Link href="/chat" className="pbtn dark">
+              Open the app <ArrowRight size={17} aria-hidden />
             </Link>
             <Link href="/attacks" className="pbtn">
               See the attack log
@@ -174,7 +174,7 @@ export default function Home() {
             </div>
           </a>
 
-          <Link href="/vendor" className="spin-badge" aria-label="Create a pay link and dare someone">
+          <Link href="/chat" className="spin-badge" aria-label="Create a pay link and dare someone">
             <svg viewBox="0 0 120 120" aria-hidden="true">
               <defs>
                 <path id="circ" d="M60 60 m-46 0 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0" />
@@ -269,7 +269,7 @@ export default function Home() {
               <p>{l.line}</p>
             </div>
           ))}
-          <Link href="/vendor" className="bcard bcta">
+          <Link href="/chat" className="bcard bcta">
             <span className="cap">your turn</span>
             <h3>Break it.</h3>
             <span className="pbtn dark small">
@@ -374,7 +374,7 @@ export default function Home() {
             <span>Whoever pays.</span>
           </h2>
           <div className="lp-cta">
-            <Link href="/vendor" className="pbtn honey">
+            <Link href="/chat" className="pbtn honey">
               Create a pay link <ArrowRight size={17} aria-hidden />
             </Link>
             <a href={REPO_URL} className="pbtn ghost-btn" target="_blank" rel="noreferrer">

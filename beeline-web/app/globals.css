@@ -728,8 +728,11 @@ pre.answer { font-size: 11.5px; padding: 10px; }
 
 /* Pages in the app frame without the ledger column (vendor, pay) */
 .app-shell.no-ledger { grid-template-columns: 236px minmax(0, 1fr); }
-.frame-main { grid-template-rows: auto 1fr; }
-.frame-scroll { overflow-y: auto; min-height: 0; }
+/* Pages inside the app frame scroll with the browser, not inside a locked-height box. */
+.app-shell.no-ledger { height: auto; min-height: 100dvh; align-items: start; }
+.frame-main { grid-template-rows: auto auto; min-height: 100dvh; }
+.frame-scroll { overflow: visible; }
+@media (min-width: 861px) { .app-shell.no-ledger .side { position: sticky; top: 0; height: 100dvh; } }
 .frame-inner { max-width: 1100px; margin: 0 auto; }
 .frame-scroll .pay-wrap { padding-top: 4px; }
 .frame-scroll .split { padding-top: 10px; }
