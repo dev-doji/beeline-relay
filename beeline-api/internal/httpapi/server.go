@@ -120,6 +120,7 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/me/invoices", h.requireUser(h.meInvoices))
 		r.Get("/me/messages", h.requireUser(h.meMessages))
 		r.Post("/me/chat", h.requireUser(h.meChat))
+		r.Post("/me/chat/new", h.requireUser(h.meNewChat))
 		r.Post("/cashout/deposit", h.cashoutDeposit)
 		r.Get("/cashout/{reference}", h.cashoutStatus)
 

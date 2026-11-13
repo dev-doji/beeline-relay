@@ -81,14 +81,22 @@ func (s *Store) AddMessage(ctx context.Context, userID, role, body string, invoi
 	if len(body) > 2000 {
 		body = body[:2000]
 	}
-	_, err := s.DB.Exec(ctx, `INSERT INTO chat_messages (user_id, role, body, invoice_id) VALUES ($1,$2,$3,$4)`, userID, role, body, invoiceID)
+	_, err := s.DB.Exec(ctx, `INSERT INTO chat_messages (user_id, role, body, invoice_id, thread)
+		VALUES ($1,$2,$3,$4, (SELECT chat_thread FROM users WHERE id = $1))`, userID, role, body, invoiceID)
 	return err
 }
 
-// Messages returns the user's most recent messages, oldest first.
+// NewThread starts a fresh conversation: later messages and history belong to it, earlier ones stay stored.
+func (s *Store) NewThread(ctx context.Context, userID string) error {
+	_, err := s.DB.Exec(ctx, `UPDATE users SET chat_thread = chat_thread + 1 WHERE id = $1`, userID)
+	return err
+}
+
+// Messages returns the most recent messages of the user's current conversation, oldest first.
 func (s *Store) Messages(ctx context.Context, userID string, limit int) ([]Message, error) {
 	rows, err := s.DB.Query(ctx, `SELECT id, role, body, invoice_id, created_at FROM (
-		SELECT id, role, body, invoice_id, created_at FROM chat_messages WHERE user_id = $1 ORDER BY id DESC LIMIT $2) t ORDER BY id`, userID, limit)
+		SELECT id, role, body, invoice_id, created_at FROM chat_messages WHERE user_id = $1
+			AND thread = (SELECT chat_thread FROM users WHERE id = $1) ORDER BY id DESC LIMIT $2) t ORDER BY id`, userID, limit)
 	if err != nil {
 		return nil, err
 	}

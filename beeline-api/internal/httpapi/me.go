@@ -149,6 +149,16 @@ func (c *chatHost) PermanentLinkPath() (string, error) {
 	return "/pay/to?" + url.Values{"name": {c.user.ShopName}, "to": {c.user.NearAccount}}.Encode(), nil
 }
 
+// meNewChat starts a fresh conversation for the signed-in user. Earlier messages stay stored but are no longer
+// shown or sent to the model.
+func (h *handlers) meNewChat(w http.ResponseWriter, r *http.Request) {
+	if err := h.d.Accounts.NewThread(r.Context(), userID(r)); err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // meChat answers a chat message. Bee (the NEAR AI agent) handles it; if the model is unavailable the
 // simple command parser still makes invoices from messages like "invoice 25 for logo design".
 func (h *handlers) meChat(w http.ResponseWriter, r *http.Request) {

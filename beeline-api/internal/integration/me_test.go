@@ -161,3 +161,39 @@ func TestSignedInUserMakesInvoicesInChatAndOnlySeesTheirOwn(t *testing.T) {
 		t.Fatalf("bob must not see alice's messages: %v", msgs)
 	}
 }
+
+func TestNewChatStartsAFreshConversation(t *testing.T) {
+	e := newMeEnv(t)
+	id := "did:privy:newchat_" + strings.ToLower(strconv.FormatInt(time.Now().UnixNano(), 36))
+	t.Cleanup(func() {
+		ctx := context.Background()
+		_, _ = pool.Exec(ctx, `DELETE FROM chat_messages WHERE user_id = $1`, id)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	})
+	tok := e.token(id)
+	count := func() int {
+		code, out := e.call(http.MethodGet, "/api/v1/me/messages", tok, nil)
+		if code != 200 {
+			t.Fatalf("messages: %d", code)
+		}
+		list, _ := out["data"].([]any)
+		return len(list)
+	}
+	e.call(http.MethodPost, "/api/v1/me/chat", tok, map[string]string{"message": "hello"})
+	if count() != 2 {
+		t.Fatalf("a first exchange is two messages, got %d", count())
+	}
+	if code, _ := e.call(http.MethodPost, "/api/v1/me/chat/new", tok, nil); code != 200 {
+		t.Fatalf("new chat: %d", code)
+	}
+	if n := count(); n != 0 {
+		t.Fatalf("a new chat must start empty, got %d messages", n)
+	}
+	e.call(http.MethodPost, "/api/v1/me/chat", tok, map[string]string{"message": "hi again"})
+	if n := count(); n != 2 {
+		t.Fatalf("the new conversation holds only its own messages, got %d", n)
+	}
+	if code, _ := e.call(http.MethodPost, "/api/v1/me/chat/new", "", nil); code != http.StatusUnauthorized {
+		t.Fatalf("starting a new chat needs sign-in, got %d", code)
+	}
+}

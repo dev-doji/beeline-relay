@@ -7,7 +7,7 @@ import { useCreateWallet } from "@privy-io/react-auth/extended-chains";
 import { ArrowRight, Ban } from "lucide-react";
 import { BeeMark } from "@/components/BeeMark";
 import { Honeycomb } from "@/components/landing/Honeycomb";
-import { ApiError, meChat, meGet, meInvoices, meMessages } from "@/lib/api";
+import { ApiError, meChat, meGet, meInvoices, meMessages, meNewChat } from "@/lib/api";
 import { ChatApp, type ChatData } from "./ChatApp";
 
 type NearWallet = { type: string; chainType?: string; address?: string };
@@ -47,6 +47,8 @@ export default function ChatPage() {
   }, [token]);
   const loadInvoices = useCallback(async () => (await meInvoices(await token())).data, [token]);
   const sendMessage = useCallback(async (message: string) => void (await meChat(await token(), message, wallet)), [token, wallet]);
+
+  const newChat = useCallback(async () => void (await meNewChat(await token())), [token]);
 
   if (!ready) return <div className="cx-center"><p className="cx-muted">Loading…</p></div>;
 
@@ -131,6 +133,7 @@ export default function ChatPage() {
       load={load}
       loadInvoices={loadInvoices}
       sendMessage={sendMessage}
+      newChat={newChat}
       walletError={walletError}
     />
   );

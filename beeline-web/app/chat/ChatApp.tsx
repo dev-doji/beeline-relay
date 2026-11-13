@@ -83,6 +83,7 @@ export function ChatApp({
   load,
   loadInvoices,
   sendMessage,
+  newChat,
   walletError,
 }: {
   email: string;
@@ -91,6 +92,7 @@ export function ChatApp({
   load: () => Promise<ChatData>;
   loadInvoices: () => Promise<Invoice[]>;
   sendMessage: (message: string) => Promise<void>;
+  newChat: () => Promise<void>;
   walletError?: string | null;
 }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -229,6 +231,13 @@ export function ChatApp({
               key={n.label}
               className={view === n.id ? "cx-nav-item active" : "cx-nav-item"}
               onClick={() => {
+                if (n.id === "welcome") {
+                  // A real new conversation: the server forgets the old one for Bee, and the screen starts empty.
+                  setMessages([]);
+                  setText("");
+                  setError(null);
+                  void newChat().catch(fail);
+                }
                 setView(n.id);
                 if (window.innerWidth < 860) setSide(false);
                 if (n.id === "welcome") input.current?.focus();

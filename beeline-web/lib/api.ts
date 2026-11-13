@@ -367,6 +367,8 @@ export const meGet = (token: string) => request<Profile>("/api/v1/me", authed(to
 export const meUpdate = (token: string, shopName: string, nearAccount: string) =>
   request<Profile>("/api/v1/me", authed(token, { method: "PUT", body: JSON.stringify({ shop_name: shopName, near_account: nearAccount }) }));
 
+export const meNewChat = (token: string) => request<{ ok: boolean }>("/api/v1/me/chat/new", authed(token, { method: "POST" }));
+
 export const meInvoices = (token: string) => request<{ data: Invoice[] }>("/api/v1/me/invoices", authed(token));
 
 export const meMessages = (token: string) => request<{ data: ChatMessage[] }>("/api/v1/me/messages", authed(token));
