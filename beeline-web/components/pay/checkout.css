@@ -1,0 +1,104 @@
+/* The customer checkout: one flat card, one job. Modelled on the Rhodium checkout (a screen where someone is about
+   to move money: confidence, not delight; one accent; nothing competing with the address they must copy right). */
+
+.ck-page {
+  --ck-bg: #f7f7fa;
+  --ck-surface: #ffffff;
+  --ck-line: #e6e6ee;
+  --ck-ink: #16162a;
+  --ck-ink2: #4d4d63;
+  --ck-ink3: #7a7a90;
+  --ck-honey: #f5c451;
+  --ck-good-bg: #eaf7ef;
+  --ck-good-line: #bcdcc8;
+  --ck-good-ink: #0f5132;
+  --ck-warn-bg: #fdf4e3;
+  --ck-warn-line: #e8d5a8;
+  --ck-warn-ink: #6b4e10;
+  --ck-bad-bg: #fdeceb;
+  --ck-bad-line: #f2c4c0;
+  --ck-bad-ink: #8a2019;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--ck-bg);
+  color: var(--ck-ink);
+  font: 14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.ck-page *, .ck-page *::before, .ck-page *::after { box-sizing: border-box; }
+.ck-page button { font: inherit; }
+
+.ck-card { width: 100%; max-width: 400px; background: var(--ck-surface); border: 1px solid var(--ck-line); padding: 26px 22px 20px; }
+
+.ck-brand { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--ck-ink3); }
+.ck-logo { width: 20px; height: 20px; background: var(--ck-ink); display: grid; place-items: center; }
+
+.ck-h1 { font-size: 17px; font-weight: 600; margin: 18px 0 2px; letter-spacing: -0.01em; }
+.ck-order { color: var(--ck-ink3); font-size: 12px; font-variant-numeric: tabular-nums; font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+.ck-items { margin: 10px 0 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--ck-ink2); }
+.ck-items li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+.ck-items li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.ck-amount { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; margin-top: 16px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.ck-unit { font-size: 20px; font-weight: 600; color: var(--ck-ink2); margin-left: 4px; }
+.ck-sub { display: block; font-size: 13px; font-weight: 500; color: var(--ck-ink3); letter-spacing: 0; margin-top: 2px; }
+.ck-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; font-weight: 500; color: var(--ck-ink2); }
+.ck-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--ck-honey); }
+.ck-chip i.real { background: #1f9d55; }
+
+.ck-rows { margin-top: 16px; }
+.ck-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--ck-line); font-size: 13px; color: var(--ck-ink2); }
+.ck-row:first-child { border-top: 0; }
+.ck-row .k { flex: 1; }
+.ck-row b { color: var(--ck-ink); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+
+.ck-label { margin-top: 16px; font-size: 11px; font-weight: 600; color: var(--ck-ink3); text-transform: uppercase; letter-spacing: 0.1em; }
+.ck-qr { display: flex; justify-content: center; margin-top: 12px; }
+.ck-qr > div { padding: 8px; background: #fff; border: 1px solid var(--ck-line); line-height: 0; }
+.ck-addr { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 14px; font-weight: 600; line-height: 1.6; margin-top: 8px; padding: 11px 12px; background: var(--ck-bg); border: 1px solid var(--ck-line);
+  overflow-wrap: anywhere; word-break: break-all; user-select: all; }
+
+.ck-btn { width: 100%; margin-top: 12px; padding: 13px; border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14.5px; font-weight: 600;
+  background: var(--ck-ink); color: #fff; transition: opacity 0.15s ease; }
+.ck-btn:hover { opacity: 0.88; }
+.ck-btn:disabled { opacity: 0.5; cursor: default; }
+.ck-btn.secondary { background: transparent; color: var(--ck-ink2); border: 1px solid var(--ck-line); font-size: 13px; padding: 11px; margin-top: 8px; font-weight: 500; }
+.ck-btn.secondary:hover { border-color: var(--ck-ink3); opacity: 1; }
+.ck-btn svg { width: 16px; height: 16px; flex: none; }
+.ck-page :focus-visible { outline: 2px solid var(--ck-ink); outline-offset: 2px; }
+
+.ck-field { display: grid; gap: 4px; margin-top: 12px; }
+.ck-field > span { font-size: 12px; font-weight: 600; color: var(--ck-ink2); }
+.ck-field input, .ck-field select { width: 100%; height: 40px; padding: 0 10px; border: 1px solid var(--ck-line); border-radius: 0; background: #fff; color: var(--ck-ink); font: 14px Inter, system-ui, sans-serif; min-height: 0; }
+.ck-field input:focus, .ck-field select:focus { outline: none; border-color: var(--ck-ink); }
+.ck-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.ck-hint { font-size: 11.5px; color: var(--ck-ink3); margin-top: 14px; text-align: center; line-height: 1.6; }
+.ck-hint b { color: var(--ck-ink2); font-weight: 600; }
+.ck-waiting { display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 12.5px; color: var(--ck-ink2); padding: 14px 0 2px; text-align: center; }
+.ck-spin { width: 13px; height: 13px; border-radius: 50%; border: 2px solid currentColor; border-top-color: transparent; animation: ck-rot 0.8s linear infinite; display: inline-block; flex: none; }
+@keyframes ck-rot { to { transform: rotate(360deg); } }
+
+.ck-err { background: var(--ck-bad-bg); border: 1px solid var(--ck-bad-line); color: var(--ck-bad-ink); padding: 11px 13px; margin-top: 14px; font-size: 13px; line-height: 1.55; }
+.ck-note { background: var(--ck-warn-bg); border: 1px solid var(--ck-warn-line); color: var(--ck-warn-ink); padding: 11px 13px; margin-top: 14px; font-size: 13px; line-height: 1.55; }
+
+.ck-ok { text-align: center; padding: 14px 0 2px; }
+.ck-check { width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 50%; background: var(--ck-good-bg); border: 1px solid var(--ck-good-line); display: flex; align-items: center; justify-content: center; color: var(--ck-good-ink); }
+.ck-check svg { width: 26px; height: 26px; }
+.ck-ok h2 { font-size: 19px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+.ck-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--ck-good-bg); color: var(--ck-good-ink); border: 1px solid var(--ck-good-line); font-size: 11.5px; font-weight: 500; padding: 5px 11px; }
+.ck-explorer { display: inline-flex; align-items: center; gap: 7px; margin-top: 16px; padding: 10px 14px; background: var(--ck-bg); border: 1px solid var(--ck-line); color: var(--ck-ink2); text-decoration: none; font-size: 12.5px; font-weight: 600; }
+.ck-tx { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10.5px; color: var(--ck-ink3); margin-top: 10px; word-break: break-all; }
+
+.ck-foot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ck-line); font-size: 11.5px; color: var(--ck-ink3); line-height: 1.6; text-align: center; }
+.ck-foot a { color: var(--ck-ink2); text-decoration: underline; text-underline-offset: 2px; }
+
+@media (max-width: 480px) {
+  .ck-page { padding: 0; align-items: flex-start; }
+  .ck-card { border-left: 0; border-right: 0; border-top: 0; min-height: 100dvh; }
+  .ck-field input, .ck-field select { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .ck-spin { animation-duration: 2.4s; } .ck-btn { transition: none; } }
