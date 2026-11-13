@@ -192,3 +192,27 @@
   .cx-shell, .cx-side, .cx-card, .cx-get, .cx-pill, .cx-send, .cx-composer { transition: none; }
   .cx-typing i { animation: none; }
 }
+
+/* Vendor books */
+.cx-ledger { display: grid; gap: 12px; margin-bottom: 16px; }
+.cx-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cx-stat { display: grid; gap: 1px; padding: 10px 12px; border: 0.8px solid #ecebf1; border-radius: 12px; background: #fff; min-width: 0; }
+.cx-stat span { font-size: 11px; color: #8e8c99; }
+.cx-stat b { font-size: 17px; font-weight: 700; color: #16162a; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.cx-stat em { font-style: normal; font-size: 11px; color: #8e8c99; }
+.cx-ledger-list { display: grid; gap: 0; border: 0.8px solid #ecebf1; border-radius: 12px; background: #fff; padding: 8px 12px; }
+.cx-ledger-list > b { padding: 4px 0 6px; }
+.cx-ledger-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 0; border-top: 0.8px solid #f1f0f5; font-size: 12.5px; }
+@media (max-width: 720px) {
+  .cx-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cx-ledger-row { grid-template-columns: 1fr auto; }
+  .cx-ledger-row > :nth-child(2), .cx-ledger-row > :nth-child(4) { display: none; }
+}
+
+/* Guard agent verdicts */
+.cx-guard { display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 0.8px solid #f1f0f5; }
+.cx-guard-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cx-guard-list li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; font-size: 12.5px; color: #5c5a6b; }
+.cx-verdict { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #e7f6ec; color: #15803d; }
+.cx-verdict.watch { background: #fdf1d2; color: #8a5a10; }
+.cx-verdict.fraud { background: #fdeceb; color: #b42318; }

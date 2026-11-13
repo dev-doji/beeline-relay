@@ -106,6 +106,16 @@ func (h *handlers) meInvoices(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": list})
 }
 
+// meLedger is the vendor's books: confirmed payments (each read from the chain or NEAR Intents by the server) and totals.
+func (h *handlers) meLedger(w http.ResponseWriter, r *http.Request) {
+	entries, sum, err := h.d.Invoices.Ledger(r.Context(), userID(r), 100)
+	if err != nil {
+		writeAppError(w, r, h.d.Logger, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"entries": entries, "summary": sum})
+}
+
 func (h *handlers) meMessages(w http.ResponseWriter, r *http.Request) {
 	list, err := h.d.Accounts.Messages(r.Context(), userID(r), 100)
 	if err != nil {

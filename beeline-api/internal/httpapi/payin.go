@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -119,6 +120,14 @@ func (h *handlers) payinStatus(w http.ResponseWriter, r *http.Request) {
 		cur, _ := h.d.Invoices.Get(ctx, inv.ID)
 		if cur == nil {
 			cur = inv
+		}
+		if q != nil {
+			switch q.Status {
+			case payin.StatusRefunded, payin.StatusFailed, payin.StatusIncomplete:
+				h.guardPayin(context.WithoutCancel(ctx), cur, q.Status, q.Chain, q.DepositAddr, q.ProviderState)
+			case payin.StatusPaid:
+				h.guardPaid(context.WithoutCancel(ctx), cur, cur.Payment)
+			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"quote": q, "invoice_status": cur.Status, "payment": cur.Payment, "checked_at": time.Now().UTC()})
 		return

@@ -443,3 +443,43 @@ export const getPayin = (invoiceId: string) =>
   request<{ quote: PayinQuote | null; invoice_status: "open" | "paid"; payment: Payment | null }>(
     `/api/v1/playground/invoices/${encodeURIComponent(invoiceId)}/payin`,
   );
+
+// ---- Vendor books and the Guard agent ----
+
+export interface LedgerEntry {
+  invoice_id: string;
+  network: "mainnet" | "testnet";
+  amount: string;
+  payer: string;
+  verification: "chain-verified" | "intents-delivered";
+  tx_hash: string;
+  paid_at: string;
+}
+
+export interface LedgerSummary {
+  collected_real: string;
+  collected_test: string;
+  paid_count: number;
+  open_count: number;
+  refused_claims: number;
+  guard_flagged: number;
+  guard_fraud: number;
+  guard_reviews: number;
+}
+
+export const meLedger = (token: string) => request<{ entries: LedgerEntry[]; summary: LedgerSummary }>("/api/v1/me/ledger", authed(token));
+
+export interface GuardReview {
+  id: number;
+  invoice_id: string;
+  subject: "claim_refused" | "payment_confirmed" | "payin_event";
+  ref: string;
+  verdict: "clear" | "watch" | "fraud";
+  reason: string;
+  model: string;
+  created_at: string;
+}
+
+/** Guard's verdicts for an invoice: an AI agent's advice. It never decides what is paid. */
+export const getInvoiceGuard = (invoiceId: string) =>
+  request<{ data: GuardReview[]; enabled: boolean }>(`/api/v1/playground/invoices/${encodeURIComponent(invoiceId)}/guard`);

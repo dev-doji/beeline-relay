@@ -26,7 +26,8 @@ import { BeeMark } from "@/components/BeeMark";
 import { ShareLink } from "@/components/invoice/ShareLink";
 import { CashOut } from "@/components/invoice/CashOut";
 import { InvoiceDetail } from "./InvoiceDetail";
-import { ApiError, type ChatMessage, type Invoice, type Profile, formatUSDC, shortKey } from "@/lib/api";
+import { Ledger } from "./Ledger";
+import { ApiError, type ChatMessage, type Invoice, type LedgerEntry, type LedgerSummary, type Profile, formatUSDC, shortKey } from "@/lib/api";
 
 type View = "welcome" | "chat" | "invoices" | "invoice" | "cash";
 type Icon = ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
@@ -85,6 +86,7 @@ export function ChatApp({
   loadInvoices,
   sendMessage,
   newChat,
+  loadLedger,
   walletError,
 }: {
   email: string;
@@ -94,6 +96,7 @@ export function ChatApp({
   loadInvoices: () => Promise<Invoice[]>;
   sendMessage: (message: string) => Promise<void>;
   newChat: () => Promise<void>;
+  loadLedger: () => Promise<{ entries: LedgerEntry[]; summary: LedgerSummary }>;
   walletError?: string | null;
 }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -394,6 +397,7 @@ export function ChatApp({
           {view === "invoices" && (
             <div className="cx-panel-view">
               <h2>Your invoices</h2>
+              <Ledger load={loadLedger} />
               {invoices.length === 0 && <p className="cx-muted">No invoices yet. Ask Bee to make one.</p>}
               <div className="cx-grid">
                 {invoices.map((i) => {

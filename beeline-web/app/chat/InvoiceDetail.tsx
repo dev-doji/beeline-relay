@@ -6,7 +6,7 @@ import { ArrowLeft, ExternalLink, ShieldCheck } from "lucide-react";
 import { Receipt } from "@/components/invoice/Receipt";
 import { ShareLink } from "@/components/invoice/ShareLink";
 import { AttemptList } from "@/components/attacks/AttemptList";
-import { type Attempt, type Invoice, type InvoiceEvent, MAINNET_TX_URL, TX_URL, formatUSDC, getInvoiceAttempts, getInvoiceEvents, shortKey } from "@/lib/api";
+import { type Attempt, type GuardReview, type Invoice, type InvoiceEvent, MAINNET_TX_URL, TX_URL, formatUSDC, getInvoiceAttempts, getInvoiceEvents, getInvoiceGuard, shortKey } from "@/lib/api";
 
 // Plain labels for the reasons Beeline refuses a payment claim.
 const EVENT_TITLE: Record<string, string> = {
@@ -34,6 +34,8 @@ const EVENT_TITLE: Record<string, string> = {
 export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: () => void }) {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [events, setEvents] = useState<InvoiceEvent[]>([]);
+  const [guardOn, setGuardOn] = useState(false);
+  const [reviews, setReviews] = useState<GuardReview[]>([]);
   useEffect(() => {
     let stop = false;
     const load = () => {
@@ -42,6 +44,13 @@ export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: (
         .catch(() => undefined);
       getInvoiceEvents(invoice.id)
         .then((r) => !stop && setEvents(r.data))
+        .catch(() => undefined);
+      getInvoiceGuard(invoice.id)
+        .then((r) => {
+          if (stop) return;
+          setGuardOn(r.enabled);
+          setReviews(r.data);
+        })
         .catch(() => undefined);
     };
     void load();
@@ -141,6 +150,24 @@ export function InvoiceDetail({ invoice, onBack }: { invoice: Invoice; onBack: (
                   </li>
                 ))}
               </ul>
+            )}
+            {guardOn && (
+              <div className="cx-guard">
+                <b className="cx-sec">Guard agent</b>
+                <p className="cx-muted cx-small">An AI agent reviews every payment event on this invoice. It advises you; it never decides what is paid.</p>
+                {reviews.length === 0 ? (
+                  <p className="cx-muted cx-small">Nothing reviewed yet.</p>
+                ) : (
+                  <ul className="cx-guard-list">
+                    {reviews.map((r) => (
+                      <li key={r.id}>
+                        <span className={`cx-verdict ${r.verdict}`}>{r.verdict === "clear" ? "Clear" : r.verdict === "watch" ? "Watch" : "Fraud"}</span>
+                        <span>{r.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
             <AttemptList attempts={attempts} empty={events.length ? "" : "Nothing suspicious so far. Payments are checked automatically."} />
           </div>

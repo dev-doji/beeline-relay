@@ -22,6 +22,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/chainverify"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/config"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/guard"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/httpapi"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
@@ -112,6 +113,13 @@ func run() error {
 		log.Info("switch cash-out enabled", "mode", sw.Mode)
 	}
 
+	// Guard: the AI fraud analyst. It needs the NEAR AI key; without it payments still work, just unreviewed.
+	var guardSvc *guard.Service
+	if chatAI != nil {
+		guardSvc = &guard.Service{DB: pool, LLM: chatAI, Model: envOr("NEAR_AI_AGENT_MODEL", "z-ai/glm-5.3-flash")}
+		log.Info("guard enabled")
+	}
+
 	cat := catalog.Default()
 	provider := intents.NewClient(cfg.IntentsBaseURL, cfg.IntentsAPIKey, 15*time.Second)
 
@@ -152,6 +160,7 @@ func run() error {
 		ClaimsMainnet:      claimsMainnet,
 		PayIn:              payIn,
 		Storage:            storage,
+		Guard:              guardSvc,
 		ChatModel:          envOr("NEAR_AI_AGENT_MODEL", "z-ai/glm-5.3-flash"),
 		Privy:              privy,
 		CashoutLive:        os.Getenv("CASHOUT_LIVE") == "on",

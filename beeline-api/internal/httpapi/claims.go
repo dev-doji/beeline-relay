@@ -75,6 +75,7 @@ func (h *handlers) claimInvoice(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, r, h.d.Logger, apperr.Validation("sender_account_id must be the NEAR account that paid"))
 		return
 	}
+	r = r.WithContext(context.WithValue(r.Context(), ctxClaimSender{}, in.Sender))
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 	inv, err := h.d.Invoices.Get(ctx, id)
@@ -134,6 +135,7 @@ func (h *handlers) claimInvoice(w http.ResponseWriter, r *http.Request) {
 		})
 		switch {
 		case err == nil:
+			h.guardPaid(context.WithoutCancel(ctx), inv, p)
 			writeJSON(w, http.StatusOK, map[string]any{"status": chainverify.StatusVerified, "payment": p})
 		case errors.Is(err, invoices.ErrTxReused):
 			// Two requests raced, or the transaction already paid something: answer from what is stored.
@@ -160,6 +162,7 @@ func (h *handlers) refuseClaim(w http.ResponseWriter, r *http.Request, invoiceID
 	if err := h.d.Invoices.AddEvent(context.WithoutCancel(r.Context()), invoiceID, kind, reason, tx); err != nil {
 		h.d.Logger.Error("record security event", "invoice", invoiceID, "error", err)
 	}
+	h.guardClaim(context.WithoutCancel(r.Context()), invoiceID, kind, reason, tx)
 	writeAppError(w, r, h.d.Logger, apperr.New(status, code, reason))
 }
 

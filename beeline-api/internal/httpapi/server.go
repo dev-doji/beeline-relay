@@ -17,6 +17,7 @@ import (
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/apperr"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/auth"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/catalog"
+	"github.com/dev-doji/beeline-relay/beeline-api/internal/guard"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/intents"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/invoices"
 	"github.com/dev-doji/beeline-relay/beeline-api/internal/payin"
@@ -77,6 +78,8 @@ type Deps struct {
 	PayIn *payin.Service
 	// Storage checks that a mainnet account can hold USDC (is registered with the token contract); nil skips the check.
 	Storage StorageChecker
+	// Guard is the AI fraud analyst that reviews payment events in the background; nil switches it off.
+	Guard *guard.Service
 }
 
 // StorageChecker is a read-only NEP-145 registration check on NEAR mainnet.
@@ -116,6 +119,7 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/playground/invoices/{id}/attempts", h.invoiceAttempts)
 		r.Post("/playground/invoices/{id}/claims", h.claimInvoice)
 		r.Get("/playground/invoices/{id}/events", h.invoiceEvents)
+		r.Get("/playground/invoices/{id}/guard", h.invoiceGuard)
 		r.Get("/payin/options", h.payinOptions)
 		r.Post("/playground/invoices/{id}/payin", h.payinCreate)
 		r.Get("/playground/invoices/{id}/payin", h.payinStatus)
@@ -126,6 +130,7 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/me", h.requireUser(h.meGet))
 		r.Put("/me", h.requireUser(h.meUpdate))
 		r.Get("/me/invoices", h.requireUser(h.meInvoices))
+		r.Get("/me/ledger", h.requireUser(h.meLedger))
 		r.Get("/me/messages", h.requireUser(h.meMessages))
 		r.Post("/me/chat", h.requireUser(h.meChat))
 		r.Post("/me/chat/new", h.requireUser(h.meNewChat))

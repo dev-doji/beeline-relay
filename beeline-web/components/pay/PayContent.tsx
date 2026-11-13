@@ -145,6 +145,10 @@ export function PayContent({ params }: { params: Promise<{ id: string }> }) {
               <div className="ck-tx">{shortKey(invoice.paid_tx, 10)}</div>
             </>
           )}
+          <br />
+          <Link className="ck-explorer" href={`/receipt/${invoice.id}`}>
+            View your receipt
+          </Link>
         </div>
       ) : real ? (
         <RealPay invoice={invoice} quote={quote} setQuote={setQuote} onPaid={() => void reload()} />
